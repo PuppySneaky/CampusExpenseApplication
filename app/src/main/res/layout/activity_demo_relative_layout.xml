@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="15dp">
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="24sp"
+        android:text="My Profile"
+        tools:ignore="HardcodedText"
+        android:id="@+id/tvProfile"
+        android:textStyle="bold"
+        android:layout_centerHorizontal="true"/>
+    <ImageView
+        android:layout_width="100dp"
+        android:layout_height="150dp"
+        android:src="@drawable/logo_btec"
+        android:layout_below="@id/tvProfile"
+        android:id="@+id/imgAvatar"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nguyen Van An"
+        android:layout_below="@id/tvProfile"
+        android:layout_toEndOf="@id/imgAvatar"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="10dp"
+        android:textSize="14sp"
+        android:textStyle="italic"
+        tools:ignore="HardcodedText" />
+</RelativeLayout>
