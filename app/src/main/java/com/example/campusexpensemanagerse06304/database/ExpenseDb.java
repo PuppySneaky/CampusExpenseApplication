@@ -22,6 +22,7 @@ import java.text.SimpleDateFormat;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -187,6 +188,50 @@ public class ExpenseDb extends SQLiteOpenHelper {
         long id = db.insert(TABLE_CATEGORY, null, values);
         db.close();
         return id;
+    }
+
+    // Add these methods to ExpenseDb.java
+
+    public boolean updateCategory(Category category) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+
+        values.put(CAT_NAME_COL, category.getName());
+        values.put(CAT_DESC_COL, category.getDescription());
+        values.put(CAT_ICON_COL, category.getIcon());
+        values.put(CAT_COLOR_COL, category.getColor());
+
+        String whereClause = CAT_ID_COL + " = ?";
+        String[] whereArgs = {String.valueOf(category.getId())};
+
+        int rowsAffected = db.update(TABLE_CATEGORY, values, whereClause, whereArgs);
+        db.close();
+        return rowsAffected > 0;
+    }
+
+    public boolean deleteCategory(int categoryId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        // First check if category is in use
+        String checkQuery = "SELECT COUNT(*) FROM " + TABLE_EXPENSE + " WHERE " + EXP_CAT_ID_COL + " = ?";
+        Cursor cursor = db.rawQuery(checkQuery, new String[]{String.valueOf(categoryId)});
+        cursor.moveToFirst();
+        int count = cursor.getInt(0);
+        cursor.close();
+
+        if (count > 0) {
+            // Category is in use, can't delete
+            db.close();
+            return false;
+        }
+
+        // Delete the category
+        String whereClause = CAT_ID_COL + " = ?";
+        String[] whereArgs = {String.valueOf(categoryId)};
+
+        int rowsAffected = db.delete(TABLE_CATEGORY, whereClause, whereArgs);
+        db.close();
+        return rowsAffected > 0;
     }
 
     @SuppressLint("Range")
@@ -623,6 +668,106 @@ public class ExpenseDb extends SQLiteOpenHelper {
         int rowsAffected = db.delete(TABLE_BUDGET, whereClause, whereArgs);
         db.close();
         return rowsAffected;
+    }
+
+    // Add these methods to ExpenseDb.java
+
+    public boolean deleteRecurringExpense(int id) {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        String whereClause = REC_ID_COL + " = ?";
+        String[] whereArgs = {String.valueOf(id)};
+
+        int rowsAffected = db.delete(TABLE_RECURRING, whereClause, whereArgs);
+        db.close();
+        return rowsAffected > 0;
+    }
+
+    // Method to check and process recurring expenses
+    public void processRecurringExpenses() {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        // Get current date
+        String currentDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+
+        // Query for recurring expenses that need to be processed
+        String query = "SELECT * FROM " + TABLE_RECURRING +
+                " WHERE " + REC_NEXT_CHARGE_COL + " <= ? " +
+                " AND (" + REC_END_DATE_COL + " IS NULL OR " + REC_END_DATE_COL + " >= ?)";
+
+        Cursor cursor = db.rawQuery(query, new String[]{currentDate, currentDate});
+
+        if (cursor.moveToFirst()) {
+            do {
+                @SuppressLint("Range") int id = cursor.getInt(cursor.getColumnIndex(REC_ID_COL));
+                @SuppressLint("Range") int userId = cursor.getInt(cursor.getColumnIndex(REC_USER_ID_COL));
+                @SuppressLint("Range") int categoryId = cursor.getInt(cursor.getColumnIndex(REC_CAT_ID_COL));
+                @SuppressLint("Range") double amount = cursor.getDouble(cursor.getColumnIndex(REC_AMOUNT_COL));
+                @SuppressLint("Range") String description = cursor.getString(cursor.getColumnIndex(REC_DESC_COL));
+                @SuppressLint("Range") String frequency = cursor.getString(cursor.getColumnIndex(REC_FREQUENCY_COL));
+                @SuppressLint("Range") String nextCharge = cursor.getString(cursor.getColumnIndex(REC_NEXT_CHARGE_COL));
+
+                // Create a new expense for this recurring charge
+                ContentValues expenseValues = new ContentValues();
+                expenseValues.put(EXP_USER_ID_COL, userId);
+                expenseValues.put(EXP_CAT_ID_COL, categoryId);
+                expenseValues.put(EXP_AMOUNT_COL, amount);
+                expenseValues.put(EXP_DESC_COL, description + " (Recurring)");
+                expenseValues.put(EXP_DATE_COL, nextCharge);
+                expenseValues.put(EXP_PAYMENT_METHOD_COL, "Automatic");
+                expenseValues.put(EXP_IS_RECURRING_COL, 1);
+                expenseValues.put(EXP_RECURRING_ID_COL, id);
+                expenseValues.put(EXP_CREATED_AT, currentDate);
+                expenseValues.put(EXP_UPDATED_AT, currentDate);
+
+                db.insert(TABLE_EXPENSE, null, expenseValues);
+
+                // Update the recurring expense with new last charged and next charge dates
+                ContentValues recurringValues = new ContentValues();
+                recurringValues.put(REC_LAST_CHARGED_COL, nextCharge);
+
+                // Calculate next charge date based on frequency
+                String newNextCharge = calculateNextChargeDate(nextCharge, frequency);
+                recurringValues.put(REC_NEXT_CHARGE_COL, newNextCharge);
+
+                String whereClause = REC_ID_COL + " = ?";
+                String[] whereArgs = {String.valueOf(id)};
+
+                db.update(TABLE_RECURRING, recurringValues, whereClause, whereArgs);
+
+            } while (cursor.moveToNext());
+        }
+
+        cursor.close();
+        db.close();
+    }
+
+    private String calculateNextChargeDate(String dateStr, String frequency) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            Date date = sdf.parse(dateStr);
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(date);
+
+            switch (frequency.toLowerCase()) {
+                case "daily":
+                    calendar.add(Calendar.DAY_OF_MONTH, 1);
+                    break;
+                case "weekly":
+                    calendar.add(Calendar.WEEK_OF_YEAR, 1);
+                    break;
+                case "monthly":
+                    calendar.add(Calendar.MONTH, 1);
+                    break;
+                case "yearly":
+                    calendar.add(Calendar.YEAR, 1);
+                    break;
+            }
+
+            return sdf.format(calendar.getTime());
+        } catch (ParseException e) {
+            return dateStr; // Return original if parsing fails
+        }
     }
 
 

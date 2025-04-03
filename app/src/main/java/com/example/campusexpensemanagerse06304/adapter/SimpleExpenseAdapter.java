@@ -1,6 +1,7 @@
 package com.example.campusexpensemanagerse06304.adapter;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,12 +38,42 @@ public class SimpleExpenseAdapter extends RecyclerView.Adapter<SimpleExpenseAdap
     public void onBindViewHolder(@NonNull ExpenseViewHolder holder, int position) {
         Expense expense = expenseList.get(position);
 
-        holder.tvDescription.setText(expense.getDescription());
-        holder.tvAmount.setText(String.format(Locale.getDefault(), "$%.2f", expense.getAmount()));
+        // Format amount with currency symbol
+        String amountText = String.format(Locale.getDefault(), "$%.2f", expense.getAmount());
+        holder.tvAmount.setText(amountText);
 
+        // Set description
+        holder.tvDescription.setText(expense.getDescription());
+
+        // Set category with color
+        if (expense.getCategoryName() != null) {
+            holder.tvCategory.setText(expense.getCategoryName());
+
+            // Set category background color
+            if (expense.getCategoryColor() != null && !expense.getCategoryColor().isEmpty()) {
+                try {
+                    int color = Color.parseColor(expense.getCategoryColor());
+                    holder.tvCategory.setBackgroundColor(color);
+                    holder.vCategoryColor.setBackgroundColor(color);
+                } catch (Exception e) {
+                    // Use default color if parsing fails
+                    holder.tvCategory.setBackgroundColor(Color.GRAY);
+                    holder.vCategoryColor.setBackgroundColor(Color.GRAY);
+                }
+            } else {
+                holder.tvCategory.setBackgroundColor(Color.GRAY);
+                holder.vCategoryColor.setBackgroundColor(Color.GRAY);
+            }
+        } else {
+            holder.tvCategory.setText("Uncategorized");
+            holder.tvCategory.setBackgroundColor(Color.GRAY);
+            holder.vCategoryColor.setBackgroundColor(Color.GRAY);
+        }
+
+        // Set date in readable format
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
         if (expense.getDate() != null) {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault());
-            holder.tvDate.setText(dateFormat.format(expense.getDate()));
+            holder.tvDate.setText(sdf.format(expense.getDate()));
         } else {
             holder.tvDate.setText("Unknown date");
         }
@@ -54,13 +85,16 @@ public class SimpleExpenseAdapter extends RecyclerView.Adapter<SimpleExpenseAdap
     }
 
     static class ExpenseViewHolder extends RecyclerView.ViewHolder {
-        TextView tvDescription, tvAmount, tvDate;
+        TextView tvDescription, tvAmount, tvDate, tvCategory;
+        View vCategoryColor;
 
         public ExpenseViewHolder(@NonNull View itemView) {
             super(itemView);
             tvDescription = itemView.findViewById(R.id.tvExpenseDescription);
             tvAmount = itemView.findViewById(R.id.tvExpenseAmount);
             tvDate = itemView.findViewById(R.id.tvExpenseDate);
+            tvCategory = itemView.findViewById(R.id.tvExpenseCategory);
+            vCategoryColor = itemView.findViewById(R.id.vCategoryColor);
         }
     }
 }

@@ -6,8 +6,10 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.RequiresApi;
@@ -16,7 +18,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campusexpensemanagerse06304.adapter.SimpleExpenseAdapter;
+import com.example.campusexpensemanagerse06304.adapter.ViewPagerAdapter;
 import com.example.campusexpensemanagerse06304.database.ExpenseDb;
+import com.example.campusexpensemanagerse06304.model.Category;
 import com.example.campusexpensemanagerse06304.model.Expense;
 
 import java.text.SimpleDateFormat;
@@ -27,11 +31,13 @@ import java.util.Locale;
 
 public class SimpleExpensesFragment extends Fragment {
     private EditText etAmount, etDescription;
+    private Spinner spinnerCategory;
     private Button btnAddExpense;
     private TextView tvNoExpenses;
     private RecyclerView recyclerExpenses;
     private SimpleExpenseAdapter expenseAdapter;
     private List<Expense> expenseList;
+    private List<Category> categoryList;
     private ExpenseDb expenseDb;
     private int userId = -1;
 
@@ -42,6 +48,7 @@ public class SimpleExpensesFragment extends Fragment {
 
         etAmount = view.findViewById(R.id.etExpenseAmount);
         etDescription = view.findViewById(R.id.etExpenseDescription);
+        spinnerCategory = view.findViewById(R.id.spinnerCategory);
         btnAddExpense = view.findViewById(R.id.btnAddExpense);
         tvNoExpenses = view.findViewById(R.id.tvNoExpenses);
         recyclerExpenses = view.findViewById(R.id.recyclerExpenses);
@@ -56,6 +63,9 @@ public class SimpleExpensesFragment extends Fragment {
                 userId = intent.getExtras().getInt("ID_USER", -1);
             }
         }
+
+        // Load categories for spinner
+        loadCategories();
 
         // Setup RecyclerView
         expenseList = new ArrayList<>();
@@ -76,6 +86,17 @@ public class SimpleExpensesFragment extends Fragment {
         });
 
         return view;
+    }
+
+    private void loadCategories() {
+        categoryList = expenseDb.getAllCategories();
+
+        // Create adapter for spinner
+        ArrayAdapter<Category> adapter = new ArrayAdapter<>(
+                getContext(), android.R.layout.simple_spinner_item, categoryList);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        spinnerCategory.setAdapter(adapter);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -103,12 +124,21 @@ public class SimpleExpensesFragment extends Fragment {
             description = "Expense"; // Default description
         }
 
+        // Get selected category
+        if (spinnerCategory.getSelectedItem() == null) {
+            Toast.makeText(getContext(), "Please select a category", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Category selectedCategory = (Category) spinnerCategory.getSelectedItem();
+        int categoryId = selectedCategory.getId();
+
         // Get current date
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         String currentDate = dateFormat.format(new Date());
 
-        // Save to database (using default category ID 1)
-        long result = expenseDb.insertExpense(userId, 1, amount, description, currentDate, "Cash", false, null);
+        // Save to database with selected category
+        long result = expenseDb.insertExpense(userId, categoryId, amount, description, currentDate, "Cash", false, null);
 
         if (result != -1) {
             Toast.makeText(getContext(), "Expense added successfully", Toast.LENGTH_SHORT).show();
@@ -118,6 +148,15 @@ public class SimpleExpensesFragment extends Fragment {
 
             // Refresh the expense list
             loadExpenses();
+
+            // Refresh the home fragment
+            if (getActivity() instanceof MenuActivity) {
+                MenuActivity activity = (MenuActivity) getActivity();
+                Fragment homeFragment = activity.getViewPagerAdapter().getFragment(0);
+                if (homeFragment instanceof SimpleHomeFragment) {
+                    ((SimpleHomeFragment) homeFragment).refreshData();
+                }
+            }
         } else {
             Toast.makeText(getContext(), "Failed to add expense", Toast.LENGTH_SHORT).show();
         }
@@ -136,6 +175,17 @@ public class SimpleExpensesFragment extends Fragment {
                 tvNoExpenses.setVisibility(View.GONE);
                 recyclerExpenses.setVisibility(View.VISIBLE);
 
+                // Add category info to expenses
+                for (Expense expense : expenses) {
+                    for (Category category : categoryList) {
+                        if (category.getId() == expense.getCategoryId()) {
+                            expense.setCategoryName(category.getName());
+                            expense.setCategoryColor(category.getColor());
+                            break;
+                        }
+                    }
+                }
+
                 // Update adapter
                 expenseList.clear();
                 expenseList.addAll(expenses);
@@ -147,7 +197,8 @@ public class SimpleExpensesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh expense list when fragment becomes visible
+        // Refresh data when fragment becomes visible
+        loadCategories();
         loadExpenses();
     }
 }

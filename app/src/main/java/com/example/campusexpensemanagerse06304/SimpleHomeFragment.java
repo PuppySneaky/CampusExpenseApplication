@@ -1,10 +1,12 @@
 package com.example.campusexpensemanagerse06304;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.TextView;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -13,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.campusexpensemanagerse06304.adapter.SimpleExpenseAdapter;
 import com.example.campusexpensemanagerse06304.database.ExpenseDb;
 import com.example.campusexpensemanagerse06304.model.Budget;
+import com.example.campusexpensemanagerse06304.model.Category;
 import com.example.campusexpensemanagerse06304.model.Expense;
 
 import java.util.ArrayList;
@@ -25,11 +28,14 @@ public class SimpleHomeFragment extends Fragment {
     private RecyclerView recyclerRecentExpenses;
     private SimpleExpenseAdapter expenseAdapter;
     private List<Expense> recentExpensesList;
+    private List<Category> categoryList;
     private ExpenseDb expenseDb;
     private int userId = -1;
     private View budgetProgressView;
     private TextView tvBudgetPercentage;
+    private View parentProgressView;
 
+    @SuppressLint("MissingInflatedId")
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -43,6 +49,7 @@ public class SimpleHomeFragment extends Fragment {
         tvNoRecentExpenses = view.findViewById(R.id.tvNoRecentExpenses);
         recyclerRecentExpenses = view.findViewById(R.id.recyclerRecentExpenses);
         budgetProgressView = view.findViewById(R.id.budgetProgressView);
+        parentProgressView = view.findViewById(R.id.progressContainer);
         tvBudgetPercentage = view.findViewById(R.id.tvBudgetPercentage);
 
         // Initialize database helper
@@ -64,10 +71,32 @@ public class SimpleHomeFragment extends Fragment {
         recyclerRecentExpenses.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerRecentExpenses.setAdapter(expenseAdapter);
 
-        // Load dashboard data
-        loadDashboardData();
+        // Wait for layout to be drawn to get accurate width for progress bar
+        parentProgressView.getViewTreeObserver().addOnGlobalLayoutListener(
+                new ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        parentProgressView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        // Now the view has been drawn and we can get accurate width
+                        loadDashboardData();
+                    }
+                });
+
+        // Load categories
+        loadCategories();
 
         return view;
+    }
+
+    private void loadCategories() {
+        categoryList = expenseDb.getAllCategories();
+    }
+
+    public void refreshData() {
+        if (isAdded()) {  // Check if fragment is still attached to activity
+            loadCategories();
+            loadDashboardData();
+        }
     }
 
     private void loadDashboardData() {
@@ -91,12 +120,12 @@ public class SimpleHomeFragment extends Fragment {
 
             // Set budget progress visualization
             int progressPercentage = totalBudget > 0 ? (int)((totalSpent / totalBudget) * 100) : 0;
-            ViewGroup.LayoutParams params = budgetProgressView.getLayoutParams();
 
-            // Calculate width based on percentage (maximum width is parent width)
-            int maxWidth = recyclerRecentExpenses.getWidth();
-            if (maxWidth > 0) {
-                params.width = maxWidth * progressPercentage / 100;
+            // Calculate width based on percentage
+            int parentWidth = parentProgressView.getWidth();
+            if (parentWidth > 0) {
+                ViewGroup.LayoutParams params = budgetProgressView.getLayoutParams();
+                params.width = (parentWidth * progressPercentage) / 100;
                 budgetProgressView.setLayoutParams(params);
             }
 
@@ -121,7 +150,6 @@ public class SimpleHomeFragment extends Fragment {
         List<Budget> budgets = expenseDb.getBudgetsByUser(userId);
 
         // For simplicity, sum all active budgets
-        // In a real app, you might want to prorate based on period and date ranges
         for (Budget budget : budgets) {
             total += budget.getAmount();
         }
@@ -141,9 +169,20 @@ public class SimpleHomeFragment extends Fragment {
             tvNoRecentExpenses.setVisibility(View.GONE);
             recyclerRecentExpenses.setVisibility(View.VISIBLE);
 
+            // Add category information to expenses
+            for (Expense expense : allExpenses) {
+                for (Category category : categoryList) {
+                    if (category.getId() == expense.getCategoryId()) {
+                        expense.setCategoryName(category.getName());
+                        expense.setCategoryColor(category.getColor());
+                        break;
+                    }
+                }
+            }
+
             // Take only most recent 3 expenses
             int count = Math.min(3, allExpenses.size());
-            List<Expense> recentExpenses = allExpenses.subList(0, count);
+            List<Expense> recentExpenses = new ArrayList<>(allExpenses.subList(0, count));
 
             // Update adapter
             recentExpensesList.clear();
@@ -156,6 +195,16 @@ public class SimpleHomeFragment extends Fragment {
     public void onResume() {
         super.onResume();
         // Refresh data when fragment becomes visible
-        loadDashboardData();
+        if (getView() != null && parentProgressView.getWidth() > 0) {
+            refreshData();
+        }
+    }
+
+    @Override
+    public void setUserVisibleHint(boolean isVisibleToUser) {
+        super.setUserVisibleHint(isVisibleToUser);
+        if (isVisibleToUser && isAdded()) {
+            refreshData();
+        }
     }
 }

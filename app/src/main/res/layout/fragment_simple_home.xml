@@ -107,6 +107,7 @@
 
                 <!-- Budget Progress Bar -->
                 <FrameLayout
+                    android:id="@+id/progressContainer"
                     android:layout_width="match_parent"
                     android:layout_height="16dp"
                     android:background="#E0E0E0">

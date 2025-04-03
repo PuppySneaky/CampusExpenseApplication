@@ -13,11 +13,19 @@
         android:orientation="horizontal"
         android:padding="12dp">
 
+        <!-- Category color indicator -->
+        <View
+            android:id="@+id/vCategoryColor"
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="#FF5722"/>
+
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:layout_marginStart="8dp">
 
             <TextView
                 android:id="@+id/tvExpenseDescription"
@@ -27,12 +35,26 @@
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
+            <!-- Added category chip/tag -->
+            <TextView
+                android:id="@+id/tvExpenseCategory"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Food"
+                android:textSize="12sp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:layout_marginTop="4dp"
+                android:textColor="@android:color/white"
+                android:background="#4CAF50" />
+
             <TextView
                 android:id="@+id/tvExpenseDate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="April 3, 2025"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
 
         <TextView
@@ -42,6 +64,8 @@
             android:text="$100.00"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="#F44336" />
+            android:textColor="#F44336"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

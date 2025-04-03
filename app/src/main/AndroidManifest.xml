@@ -22,6 +22,10 @@
         <activity android:name=".ForgetPasswordActivity"/>
         <activity android:name=".UpdatePasswordActivity"/>
         <activity android:name=".SignUpActivity"/>
+        <activity android:name=".CategoryManagementActivity"
+            android:exported="false" />
+        <activity android:name=".RecurringExpenseActivity"
+            android:exported="false" />
         <activity
             android:name=".SignInActivity"
             android:exported="true"

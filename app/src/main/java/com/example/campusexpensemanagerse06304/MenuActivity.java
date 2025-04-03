@@ -1,11 +1,7 @@
 package com.example.campusexpensemanagerse06304;
 
-import android.content.ContentValues;
 import android.content.Intent;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
@@ -16,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.fragment.app.Fragment;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.campusexpensemanagerse06304.adapter.ViewPagerAdapter;
@@ -28,19 +25,20 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
     ViewPager2 viewPager2;
     DrawerLayout drawerLayout;
     Toolbar toolbar;
+    private ViewPagerAdapter viewPagerAdapter;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
+
+        // Initialize database
+        initializeDatabase();
+
         bottomNavigationView = findViewById(R.id.bottom_navigation);
         viewPager2 = findViewById(R.id.viewPager);
         drawerLayout = findViewById(R.id.drawer_layout);
         toolbar = findViewById(R.id.toolbar);
-
-        initializeDatabase();
-
-        bottomNavigationView = findViewById(R.id.bottom_navigation);
 
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -82,59 +80,13 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
             return true;
         });
 
-
-    }
-
-    private void initializeDatabase() {
-        ExpenseDb expenseDb = new ExpenseDb(this);
-        SQLiteDatabase db = expenseDb.getWritableDatabase();
-
-        try {
-            // First check if the categories table exists
-            Cursor cursor = db.rawQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'", null);
-            boolean tableExists = cursor.getCount() > 0;
-            cursor.close();
-
-            if (!tableExists) {
-                // Table doesn't exist, so we need to create it
-                expenseDb.onCreate(db);
-            } else {
-                // Table exists, check if it has data
-                cursor = db.rawQuery("SELECT COUNT(*) FROM categories", null);
-                cursor.moveToFirst();
-                int count = cursor.getInt(0);
-                cursor.close();
-
-                if (count == 0) {
-                    // Insert default categories
-                    String[] categories = {"Housing", "Food", "Transportation", "Entertainment", "Education", "Health"};
-                    String[] colors = {"#FF5722", "#4CAF50", "#2196F3", "#9C27B0", "#FFC107", "#E91E63"};
-
-                    for (int i = 0; i < categories.length; i++) {
-                        ContentValues values = new ContentValues();
-                        values.put("name", categories[i]);
-                        values.put("description", categories[i] + " expenses");
-                        values.put("color", colors[i]);
-                        db.insert("categories", null, values);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // If an error occurs, create tables directly
-            Log.e("MenuActivity", "Database initialization error: " + e.getMessage());
-            expenseDb.onCreate(db);
-        } finally {
-            db.close();
-        }
-    }
-    private void setupViewPager(){
-        ViewPagerAdapter viewPagerAdapter = new ViewPagerAdapter(getSupportFragmentManager(), getLifecycle());
-        viewPager2.setAdapter(viewPagerAdapter);
+        // Set page change callback to refresh fragments when switching tabs
         viewPager2.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
+
+                // Update bottom navigation
                 if (position == 0){
                     bottomNavigationView.getMenu().findItem(R.id.menu_home).setChecked(true);
                 } else if (position == 1) {
@@ -145,21 +97,35 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
                     bottomNavigationView.getMenu().findItem(R.id.menu_history).setChecked(true);
                 } else if (position == 4) {
                     bottomNavigationView.getMenu().findItem(R.id.menu_setting).setChecked(true);
-                }else {
-                    bottomNavigationView.getMenu().findItem(R.id.menu_home).setChecked(true);
+                }
+
+                // Refresh the current fragment
+                Fragment currentFragment = viewPagerAdapter.getFragment(position);
+                if (currentFragment instanceof SimpleHomeFragment) {
+                    ((SimpleHomeFragment) currentFragment).refreshData();
                 }
             }
-
-            @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-                super.onPageScrolled(position, positionOffset, positionOffsetPixels);
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-                super.onPageScrollStateChanged(state);
-            }
         });
+    }
+
+    private void setupViewPager(){
+        viewPagerAdapter = new ViewPagerAdapter(getSupportFragmentManager(), getLifecycle());
+        viewPager2.setAdapter(viewPagerAdapter);
+    }
+
+    public ViewPagerAdapter getViewPagerAdapter() {
+        return viewPagerAdapter;
+    }
+
+    private void initializeDatabase() {
+        ExpenseDb expenseDb = new ExpenseDb(this);
+
+        try {
+            // Force database creation
+            expenseDb.getWritableDatabase().close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -174,7 +140,7 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
             viewPager2.setCurrentItem(3);
         } else if (item.getItemId() == R.id.menu_setting) {
             viewPager2.setCurrentItem(4);
-        }else {
+        } else {
             viewPager2.setCurrentItem(0);
         }
         drawerLayout.closeDrawer(GravityCompat.START);
