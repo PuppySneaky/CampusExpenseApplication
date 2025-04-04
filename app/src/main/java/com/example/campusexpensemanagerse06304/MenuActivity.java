@@ -242,6 +242,17 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
+    /**
+     * Force refresh the fragment at the specified position
+     * @param position Position of the fragment to refresh
+     */
+    public void refreshFragmentAtPosition(int position) {
+        Fragment fragment = viewPagerAdapter.getFragment(position);
+        if (fragment instanceof RefreshableFragment) {
+            ((RefreshableFragment) fragment).refreshData();
+        }
+    }
+
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == R.id.menu_home){
