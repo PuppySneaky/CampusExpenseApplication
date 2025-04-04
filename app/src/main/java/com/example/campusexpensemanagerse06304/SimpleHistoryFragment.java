@@ -3,6 +3,7 @@ package com.example.campusexpensemanagerse06304;
 import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,6 +13,7 @@ import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -30,6 +32,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class SimpleHistoryFragment extends Fragment {
+    private static final String TAG = "SimpleHistoryFragment";
+
     private TextView tvStartDate, tvEndDate, tvTotalAmount, tvNoExpenses;
     private Spinner spinnerHistoryCategory;
     private Button btnApplyFilter, btnGenerateReport;
@@ -66,6 +70,7 @@ public class SimpleHistoryFragment extends Fragment {
             Intent intent = getActivity().getIntent();
             if (intent != null && intent.getExtras() != null) {
                 userId = intent.getExtras().getInt("ID_USER", -1);
+                Log.d(TAG, "User ID loaded: " + userId);
             }
         }
 
@@ -95,8 +100,8 @@ public class SimpleHistoryFragment extends Fragment {
         // Setup Apply Filter button
         btnApplyFilter.setOnClickListener(v -> filterExpenses());
 
-        // Setup Generate Report button
-        btnGenerateReport.setOnClickListener(v -> generateReport());
+        // Setup Generate Report button with enhanced functionality
+        btnGenerateReport.setOnClickListener(v -> showReportOptions());
 
         // Load initial data
         filterExpenses();
@@ -104,8 +109,71 @@ public class SimpleHistoryFragment extends Fragment {
         return view;
     }
 
+    /**
+     * Show dialog with report generation options
+     */
+    private void showReportOptions() {
+        if (filteredExpensesList.isEmpty()) {
+            Toast.makeText(getContext(), "No expenses to generate report", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Create report options
+        String[] reportOptions = {"CSV Report", "PDF Report", "Cancel"};
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Generate Report");
+        builder.setItems(reportOptions, (dialog, which) -> {
+            switch (which) {
+                case 0: // CSV Report
+                    generateAndShareReport("csv");
+                    break;
+                case 1: // PDF Report
+                    generateAndShareReport("pdf");
+                    break;
+                case 2: // Cancel
+                    dialog.dismiss();
+                    break;
+            }
+        });
+        builder.show();
+    }
+
+    /**
+     * Generate and share the report
+     * @param format Report format (csv or pdf)
+     */
+    private void generateAndShareReport(String format) {
+        String startDateStr = tvStartDate.getText().toString();
+        String endDateStr = tvEndDate.getText().toString();
+
+        ReportGenerator reportGenerator = new ReportGenerator(getContext());
+        String filePath;
+
+        if ("csv".equals(format)) {
+            filePath = reportGenerator.generateCSVReport(userId, startDateStr, endDateStr);
+        } else {
+            filePath = reportGenerator.generatePDFReport(userId, startDateStr, endDateStr);
+        }
+
+        if (filePath != null) {
+            // Show success message
+            Toast.makeText(getContext(),
+                    "Report generated successfully",
+                    Toast.LENGTH_SHORT).show();
+
+            // Share the report
+            reportGenerator.shareReport(filePath);
+        } else {
+            Toast.makeText(getContext(),
+                    "Failed to generate report. Please try again.",
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void loadCategories() {
         categoryList = expenseDb.getAllCategories();
+        Log.d(TAG, "Loaded " + categoryList.size() + " categories");
 
         // Create a list with "All Categories" option
         List<Category> spinnerCategories = new ArrayList<>();
@@ -132,6 +200,7 @@ public class SimpleHistoryFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 Category selectedCategory = (Category) parent.getItemAtPosition(position);
                 selectedCategoryId = selectedCategory.getId();
+                Log.d(TAG, "Selected category: " + selectedCategory.getName() + " (ID: " + selectedCategoryId + ")");
             }
 
             @Override
@@ -209,14 +278,17 @@ public class SimpleHistoryFragment extends Fragment {
 
             // Update total amount
             tvTotalAmount.setText(String.format(Locale.getDefault(), "$%.2f", totalAmount));
+            Log.d(TAG, "Total filtered amount: $" + totalAmount);
 
             // Update UI based on results
             if (filteredExpenses.isEmpty()) {
                 tvNoExpenses.setVisibility(View.VISIBLE);
                 recyclerHistory.setVisibility(View.GONE);
+                Log.d(TAG, "No expenses match the filters");
             } else {
                 tvNoExpenses.setVisibility(View.GONE);
                 recyclerHistory.setVisibility(View.VISIBLE);
+                Log.d(TAG, "Found " + filteredExpenses.size() + " expenses matching filters");
 
                 // Update adapter
                 filteredExpensesList.clear();
@@ -224,44 +296,15 @@ public class SimpleHistoryFragment extends Fragment {
                 expenseAdapter.notifyDataSetChanged();
             }
         } catch (ParseException e) {
+            Log.e(TAG, "Error parsing dates", e);
             Toast.makeText(getContext(), "Invalid date format", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    private void generateReport() {
-        // In a real app, you might generate a PDF or CSV file here
-        // For now, just show a summary toast
-
-        String startDateStr = tvStartDate.getText().toString();
-        String endDateStr = tvEndDate.getText().toString();
-        String totalAmountStr = tvTotalAmount.getText().toString();
-        int expenseCount = filteredExpensesList.size();
-
-        // Get category name if filtering by category
-        String categoryName = "All Categories";
-        if (selectedCategoryId != -1) {
-            for (Category category : categoryList) {
-                if (category.getId() == selectedCategoryId) {
-                    categoryName = category.getName();
-                    break;
-                }
-            }
-        }
-
-        String reportSummary = "Expense Report\n" +
-                "Period: " + startDateStr + " to " + endDateStr + "\n" +
-                "Category: " + categoryName + "\n" +
-                "Total Amount: " + totalAmountStr + "\n" +
-                "Number of Expenses: " + expenseCount;
-
-        Toast.makeText(getContext(), "Report Generated!\n\n" + reportSummary, Toast.LENGTH_LONG).show();
     }
 
     @Override
     public void onResume() {
         super.onResume();
         // Refresh data when fragment becomes visible
-        loadCategories();
         filterExpenses();
     }
 }

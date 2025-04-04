@@ -3,6 +3,9 @@ package com.example.campusexpensemanagerse06304;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,7 +32,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class SimpleExpensesFragment extends Fragment {
+public class SimpleExpensesFragment extends Fragment implements RefreshableFragment {
+    private static final String TAG = "SimpleExpensesFragment";
+
     private EditText etAmount, etDescription;
     private Spinner spinnerCategory;
     private Button btnAddExpense;
@@ -61,6 +66,7 @@ public class SimpleExpensesFragment extends Fragment {
             Intent intent = getActivity().getIntent();
             if (intent != null && intent.getExtras() != null) {
                 userId = intent.getExtras().getInt("ID_USER", -1);
+                Log.d(TAG, "User ID: " + userId);
             }
         }
 
@@ -90,6 +96,7 @@ public class SimpleExpensesFragment extends Fragment {
 
     private void loadCategories() {
         categoryList = expenseDb.getAllCategories();
+        Log.d(TAG, "Loaded " + categoryList.size() + " categories");
 
         // Create adapter for spinner
         ArrayAdapter<Category> adapter = new ArrayAdapter<>(
@@ -132,6 +139,7 @@ public class SimpleExpensesFragment extends Fragment {
 
         Category selectedCategory = (Category) spinnerCategory.getSelectedItem();
         int categoryId = selectedCategory.getId();
+        Log.d(TAG, "Selected category: " + selectedCategory.getName() + " (ID: " + categoryId + ")");
 
         // Get current date
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
@@ -141,6 +149,7 @@ public class SimpleExpensesFragment extends Fragment {
         long result = expenseDb.insertExpense(userId, categoryId, amount, description, currentDate, "Cash", false, null);
 
         if (result != -1) {
+            Log.d(TAG, "Expense added successfully with ID: " + result);
             Toast.makeText(getContext(), "Expense added successfully", Toast.LENGTH_SHORT).show();
             // Clear input fields
             etAmount.setText("");
@@ -149,16 +158,50 @@ public class SimpleExpensesFragment extends Fragment {
             // Refresh the expense list
             loadExpenses();
 
-            // Refresh the home fragment
-            if (getActivity() instanceof MenuActivity) {
-                MenuActivity activity = (MenuActivity) getActivity();
-                Fragment homeFragment = activity.getViewPagerAdapter().getFragment(0);
-                if (homeFragment instanceof SimpleHomeFragment) {
-                    ((SimpleHomeFragment) homeFragment).refreshData();
-                }
-            }
+            // IMPORTANT: Force update budget information with a small delay
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                updateBudgetFragment();
+                updateHomeFragment();
+            }, 500);
         } else {
+            Log.e(TAG, "Failed to add expense");
             Toast.makeText(getContext(), "Failed to add expense", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void updateBudgetFragment() {
+        if (getActivity() instanceof MenuActivity) {
+            MenuActivity activity = (MenuActivity) getActivity();
+            ViewPagerAdapter adapter = activity.getViewPagerAdapter();
+
+            Log.d(TAG, "Forcing budget fragment update");
+
+            // Get budget fragment directly
+            Fragment budgetFragment = adapter.getFragment(2);
+            if (budgetFragment instanceof SimpleBudgetFragment) {
+                Log.d(TAG, "Directly calling loadBudgets on SimpleBudgetFragment");
+                ((SimpleBudgetFragment) budgetFragment).loadBudgets();
+            }
+
+            // If we're currently on the Budget tab, force refresh display
+            if (activity.viewPager2.getCurrentItem() == 2) {
+                activity.refreshFragmentAtPosition(2);
+            }
+        }
+    }
+
+    private void updateHomeFragment() {
+        if (getActivity() instanceof MenuActivity) {
+            MenuActivity activity = (MenuActivity) getActivity();
+            ViewPagerAdapter adapter = activity.getViewPagerAdapter();
+
+            Log.d(TAG, "Forcing home fragment update");
+
+            // Update home fragment
+            Fragment homeFragment = adapter.getFragment(0);
+            if (homeFragment instanceof RefreshableFragment) {
+                ((RefreshableFragment) homeFragment).refreshData();
+            }
         }
     }
 
@@ -166,6 +209,7 @@ public class SimpleExpensesFragment extends Fragment {
         if (userId != -1) {
             // Get expenses from database
             List<Expense> expenses = expenseDb.getExpensesByUser(userId);
+            Log.d(TAG, "Loaded " + expenses.size() + " expenses");
 
             // Update UI based on results
             if (expenses.isEmpty()) {
@@ -195,10 +239,19 @@ public class SimpleExpensesFragment extends Fragment {
     }
 
     @Override
+    public void refreshData() {
+        if (isAdded() && getContext() != null) {
+            Log.d(TAG, "refreshData called");
+            loadCategories();
+            loadExpenses();
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
+        Log.d(TAG, "onResume called");
         // Refresh data when fragment becomes visible
-        loadCategories();
-        loadExpenses();
+        refreshData();
     }
 }

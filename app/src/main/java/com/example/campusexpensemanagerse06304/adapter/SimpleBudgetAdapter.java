@@ -19,8 +19,8 @@ import java.util.Locale;
 
 public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapter.BudgetViewHolder> {
 
-    private Context context;
-    private List<Budget> budgetList;
+    private final Context context;
+    private final List<Budget> budgetList;
 
     public SimpleBudgetAdapter(Context context, List<Budget> budgetList) {
         this.context = context;
@@ -92,5 +92,12 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
             tvPeriod = itemView.findViewById(R.id.tvBudgetPeriod);
             progressBar = itemView.findViewById(R.id.progressBudget);
         }
+    }
+
+    // Add method to update the budget list with new data
+    public void updateBudgets(List<Budget> newBudgets) {
+        this.budgetList.clear();
+        this.budgetList.addAll(newBudgets);
+        notifyDataSetChanged();
     }
 }
