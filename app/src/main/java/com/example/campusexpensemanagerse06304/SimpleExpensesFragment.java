@@ -1,5 +1,6 @@
 package com.example.campusexpensemanagerse06304;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -141,6 +142,13 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         int categoryId = selectedCategory.getId();
         Log.d(TAG, "Selected category: " + selectedCategory.getName() + " (ID: " + categoryId + ")");
 
+        // NEW CODE: Check if this expense would exceed the category budget
+        if (!expenseDb.checkCategoryBudgetBalance(userId, categoryId, amount)) {
+            // Show an error dialog with more details
+            showBudgetExceededDialog(selectedCategory.getName(), amount);
+            return;
+        }
+
         // Get current date
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         String currentDate = dateFormat.format(new Date());
@@ -158,7 +166,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
             // Refresh the expense list
             loadExpenses();
 
-            // IMPORTANT: Force update budget information with a small delay
+            // Force update budget information with a small delay
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 updateBudgetFragment();
                 updateHomeFragment();
@@ -167,6 +175,60 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
             Log.e(TAG, "Failed to add expense");
             Toast.makeText(getContext(), "Failed to add expense", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    // Add this new method to show a detailed budget exceeded dialog
+    private void showBudgetExceededDialog(String categoryName, double expenseAmount) {
+        if (getContext() == null) return;
+
+        // Get remaining budget for this category
+        int categoryId = ((Category) spinnerCategory.getSelectedItem()).getId();
+        double remainingBudget = expenseDb.getRemainingCategoryBudget(userId, categoryId);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Budget Limit Exceeded");
+        builder.setMessage("Adding this expense of $" + String.format(Locale.getDefault(), "%.2f", expenseAmount) +
+                " would exceed your budget for " + categoryName + ".\n\n" +
+                "Remaining budget: $" + String.format(Locale.getDefault(), "%.2f", remainingBudget) + "\n\n" +
+                "Would you like to increase your budget for this category?");
+
+        // Add buttons
+        builder.setPositiveButton("Increase Budget", (dialog, which) -> {
+            // Navigate to budget tab and select this category
+            if (getActivity() instanceof MenuActivity) {
+                MenuActivity activity = (MenuActivity) getActivity();
+                // Switch to budget tab (index 2)
+                activity.viewPager2.setCurrentItem(2);
+
+                // Pre-select the category in the budget fragment
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    Fragment budgetFragment = activity.getViewPagerAdapter().getFragment(2);
+                    if (budgetFragment instanceof SimpleBudgetFragment) {
+                        // Use reflection to access private fields (not ideal, but works for this example)
+                        try {
+                            Spinner categorySpinner = budgetFragment.getView().findViewById(R.id.spinnerBudgetCategory);
+                            for (int i = 0; i < categorySpinner.getCount(); i++) {
+                                Category cat = (Category) categorySpinner.getItemAtPosition(i);
+                                if (cat.getId() == categoryId) {
+                                    categorySpinner.setSelection(i);
+                                    break;
+                                }
+                            }
+
+                            // Also pre-fill the amount field with the expense amount
+                            EditText amountField = budgetFragment.getView().findViewById(R.id.etCategoryBudgetAmount);
+                            amountField.setText(String.valueOf(expenseAmount));
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error pre-selecting category in budget fragment", e);
+                        }
+                    }
+                }, 300);
+            }
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+        builder.show();
     }
 
     private void updateBudgetFragment() {

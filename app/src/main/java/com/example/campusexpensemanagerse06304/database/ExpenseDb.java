@@ -28,9 +28,9 @@ import java.util.List;
 import java.util.Locale;
 
 public class ExpenseDb extends SQLiteOpenHelper {
-
+    private static final String TAG = "ExpenseDb";
     private static final String DB_NAME = "campus expenses";
-    private static final int DB_VERSION = 1;
+    private static final int DB_VERSION = 2; // Increased version number!
 
     // Category table
     private static final String TABLE_CATEGORY = "categories";
@@ -80,6 +80,17 @@ public class ExpenseDb extends SQLiteOpenHelper {
     private static final String REC_NEXT_CHARGE_COL = "next_charge";
     private static final String REC_CREATED_AT = "created_at";
     private static final String REC_UPDATED_AT = "updated_at";
+
+    // Total Budget table
+    private static final String TABLE_TOTAL_BUDGET = "total_budget";
+    private static final String TOT_ID_COL = "id";
+    private static final String TOT_USER_ID_COL = "user_id";
+    private static final String TOT_AMOUNT_COL = "amount";
+    private static final String TOT_PERIOD_COL = "period";
+    private static final String TOT_START_DATE_COL = "start_date";
+    private static final String TOT_END_DATE_COL = "end_date";
+    private static final String TOT_CREATED_AT = "created_at";
+    private static final String TOT_UPDATED_AT = "updated_at";
 
     public ExpenseDb(@Nullable Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -137,28 +148,87 @@ public class ExpenseDb extends SQLiteOpenHelper {
                     + REC_CREATED_AT + " DATETIME, "
                     + REC_UPDATED_AT + " DATETIME )";
 
+            // Create Total Budget table
+            String createTotalBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_TOTAL_BUDGET + " ( "
+                    + TOT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + TOT_USER_ID_COL + " INTEGER NOT NULL, "
+                    + TOT_AMOUNT_COL + " REAL NOT NULL, "
+                    + TOT_PERIOD_COL + " TEXT NOT NULL, "
+                    + TOT_START_DATE_COL + " DATE NOT NULL, "
+                    + TOT_END_DATE_COL + " DATE, "
+                    + TOT_CREATED_AT + " DATETIME, "
+                    + TOT_UPDATED_AT + " DATETIME )";
+
             // Execute table creation
             db.execSQL(createCategoryTable);
             db.execSQL(createExpenseTable);
             db.execSQL(createBudgetTable);
             db.execSQL(createRecurringTable);
+            db.execSQL(createTotalBudgetTable);
 
             // Insert default categories
             insertDefaultCategories(db);
+
+            Log.d(TAG, "Database tables created successfully");
         } catch (Exception e) {
-            // Log the error but don't crash
-            Log.e("ExpenseDb", "Error creating database tables: " + e.getMessage());
+            Log.e(TAG, "Error creating database tables: " + e.getMessage());
         }
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Drop existing tables and recreate
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_RECURRING);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_BUDGET);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_EXPENSE);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_CATEGORY);
-        onCreate(db);
+        Log.d(TAG, "Upgrading database from version " + oldVersion + " to " + newVersion);
+        try {
+            if (oldVersion < 2) {
+                // Create the new total_budget table without dropping existing tables
+                String createTotalBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_TOTAL_BUDGET + " ( "
+                        + TOT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        + TOT_USER_ID_COL + " INTEGER NOT NULL, "
+                        + TOT_AMOUNT_COL + " REAL NOT NULL, "
+                        + TOT_PERIOD_COL + " TEXT NOT NULL, "
+                        + TOT_START_DATE_COL + " DATE NOT NULL, "
+                        + TOT_END_DATE_COL + " DATE, "
+                        + TOT_CREATED_AT + " DATETIME, "
+                        + TOT_UPDATED_AT + " DATETIME )";
+                db.execSQL(createTotalBudgetTable);
+                Log.d(TAG, "Created total_budget table during upgrade");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error during database upgrade: " + e.getMessage());
+        }
+    }
+
+    // Helper method to create missing tables
+    public void ensureTablesExist() {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        try {
+            // Check if total_budget table exists
+            Cursor cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    new String[]{TABLE_TOTAL_BUDGET});
+
+            boolean totalBudgetExists = cursor.getCount() > 0;
+            cursor.close();
+
+            if (!totalBudgetExists) {
+                Log.d(TAG, "Total budget table does not exist, creating it now");
+                String createTotalBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_TOTAL_BUDGET + " ( "
+                        + TOT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        + TOT_USER_ID_COL + " INTEGER NOT NULL, "
+                        + TOT_AMOUNT_COL + " REAL NOT NULL, "
+                        + TOT_PERIOD_COL + " TEXT NOT NULL, "
+                        + TOT_START_DATE_COL + " DATE NOT NULL, "
+                        + TOT_END_DATE_COL + " DATE, "
+                        + TOT_CREATED_AT + " DATETIME, "
+                        + TOT_UPDATED_AT + " DATETIME )";
+                db.execSQL(createTotalBudgetTable);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error ensuring tables exist: " + e.getMessage());
+        } finally {
+            db.close();
+        }
     }
 
     // Helper method to insert default categories
@@ -189,8 +259,6 @@ public class ExpenseDb extends SQLiteOpenHelper {
         db.close();
         return id;
     }
-
-    // Add these methods to ExpenseDb.java
 
     public boolean updateCategory(Category category) {
         SQLiteDatabase db = this.getWritableDatabase();
@@ -690,8 +758,6 @@ public class ExpenseDb extends SQLiteOpenHelper {
         return rowsAffected;
     }
 
-    // Add these methods to ExpenseDb.java
-
     public boolean deleteRecurringExpense(int id) {
         SQLiteDatabase db = this.getWritableDatabase();
 
@@ -703,161 +769,357 @@ public class ExpenseDb extends SQLiteOpenHelper {
         return rowsAffected > 0;
     }
 
-    // Method to check and process recurring expenses
-    public void processRecurringExpenses() {
+    // Total Budget methods
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public long insertOrUpdateTotalBudget(int userId, double amount, String period, String startDate, String endDate) {
+        ensureTablesExist(); // Make sure the table exists first
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        ZonedDateTime zoneDt = ZonedDateTime.now();
+        String currentDate = dtf.format(zoneDt);
+
         SQLiteDatabase db = this.getWritableDatabase();
 
-        // Get current date
-        String currentDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        // Check if a total budget already exists for this user and period
+        String query = "SELECT " + TOT_ID_COL + " FROM " + TABLE_TOTAL_BUDGET +
+                " WHERE " + TOT_USER_ID_COL + " = ? AND " +
+                TOT_PERIOD_COL + " = ?";
 
-        // Query for recurring expenses that need to be processed
-        String query = "SELECT * FROM " + TABLE_RECURRING +
-                " WHERE " + REC_NEXT_CHARGE_COL + " <= ? " +
-                " AND (" + REC_END_DATE_COL + " IS NULL OR " + REC_END_DATE_COL + " >= ?)";
+        long result = -1;
+        try {
+            Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(userId), period});
 
-        Cursor cursor = db.rawQuery(query, new String[]{currentDate, currentDate});
+            if (cursor.moveToFirst()) {
+                // Update existing total budget
+                @SuppressLint("Range") int id = cursor.getInt(cursor.getColumnIndex(TOT_ID_COL));
+                cursor.close();
 
-        if (cursor.moveToFirst()) {
-            do {
-                @SuppressLint("Range") int id = cursor.getInt(cursor.getColumnIndex(REC_ID_COL));
-                @SuppressLint("Range") int userId = cursor.getInt(cursor.getColumnIndex(REC_USER_ID_COL));
-                @SuppressLint("Range") int categoryId = cursor.getInt(cursor.getColumnIndex(REC_CAT_ID_COL));
-                @SuppressLint("Range") double amount = cursor.getDouble(cursor.getColumnIndex(REC_AMOUNT_COL));
-                @SuppressLint("Range") String description = cursor.getString(cursor.getColumnIndex(REC_DESC_COL));
-                @SuppressLint("Range") String frequency = cursor.getString(cursor.getColumnIndex(REC_FREQUENCY_COL));
-                @SuppressLint("Range") String nextCharge = cursor.getString(cursor.getColumnIndex(REC_NEXT_CHARGE_COL));
+                ContentValues values = new ContentValues();
+                values.put(TOT_AMOUNT_COL, amount);
+                values.put(TOT_START_DATE_COL, startDate);
+                if (endDate != null && !endDate.isEmpty()) {
+                    values.put(TOT_END_DATE_COL, endDate);
+                }
+                values.put(TOT_UPDATED_AT, currentDate);
 
-                // Create a new expense for this recurring charge
-                ContentValues expenseValues = new ContentValues();
-                expenseValues.put(EXP_USER_ID_COL, userId);
-                expenseValues.put(EXP_CAT_ID_COL, categoryId);
-                expenseValues.put(EXP_AMOUNT_COL, amount);
-                expenseValues.put(EXP_DESC_COL, description + " (Recurring)");
-                expenseValues.put(EXP_DATE_COL, nextCharge);
-                expenseValues.put(EXP_PAYMENT_METHOD_COL, "Automatic");
-                expenseValues.put(EXP_IS_RECURRING_COL, 1);
-                expenseValues.put(EXP_RECURRING_ID_COL, id);
-                expenseValues.put(EXP_CREATED_AT, currentDate);
-                expenseValues.put(EXP_UPDATED_AT, currentDate);
-
-                db.insert(TABLE_EXPENSE, null, expenseValues);
-
-                // Update the recurring expense with new last charged and next charge dates
-                ContentValues recurringValues = new ContentValues();
-                recurringValues.put(REC_LAST_CHARGED_COL, nextCharge);
-
-                // Calculate next charge date based on frequency
-                String newNextCharge = calculateNextChargeDate(nextCharge, frequency);
-                recurringValues.put(REC_NEXT_CHARGE_COL, newNextCharge);
-
-                String whereClause = REC_ID_COL + " = ?";
+                String whereClause = TOT_ID_COL + " = ?";
                 String[] whereArgs = {String.valueOf(id)};
 
-                db.update(TABLE_RECURRING, recurringValues, whereClause, whereArgs);
-
-            } while (cursor.moveToNext());
-        }
-
-        cursor.close();
-        db.close();
-    }
-
-    private String calculateNextChargeDate(String dateStr, String frequency) {
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            Date date = sdf.parse(dateStr);
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(date);
-
-            switch (frequency.toLowerCase()) {
-                case "daily":
-                    calendar.add(Calendar.DAY_OF_MONTH, 1);
-                    break;
-                case "weekly":
-                    calendar.add(Calendar.WEEK_OF_YEAR, 1);
-                    break;
-                case "monthly":
-                    calendar.add(Calendar.MONTH, 1);
-                    break;
-                case "yearly":
-                    calendar.add(Calendar.YEAR, 1);
-                    break;
-            }
-
-            return sdf.format(calendar.getTime());
-        } catch (ParseException e) {
-            return dateStr; // Return original if parsing fails
-        }
-    }
-
-    /**
-     * Method to check if a budget exists for a user/category/period and update it,
-     * or create a new one if it doesn't exist
-     */
-    @SuppressLint("Range")
-    public long updateOrInsertBudget(int userId, int categoryId, double amount, String period, String startDate, String endDate) {
-        SQLiteDatabase db = this.getWritableDatabase();
-
-        // Check if a budget already exists for this user, category, and period
-        String selection = BUD_USER_ID_COL + " = ? AND " +
-                BUD_CAT_ID_COL + " = ? AND " +
-                BUD_PERIOD_COL + " = ?";
-        String[] selectionArgs = {String.valueOf(userId), String.valueOf(categoryId), period};
-
-        Cursor cursor = db.query(TABLE_BUDGET, new String[]{BUD_ID_COL}, selection, selectionArgs, null, null, null);
-
-        long result;
-        if (cursor.moveToFirst()) {
-            // Budget exists, update it
-            int budgetId = cursor.getInt(cursor.getColumnIndex(BUD_ID_COL));
-            cursor.close();
-
-            ContentValues values = new ContentValues();
-            values.put(BUD_AMOUNT_COL, amount);
-            values.put(BUD_START_DATE_COL, startDate);
-            if (endDate != null && !endDate.isEmpty()) {
-                values.put(BUD_END_DATE_COL, endDate);
-            }
-
-            String currentDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
-            values.put(BUD_UPDATED_AT, currentDate);
-
-            result = db.update(TABLE_BUDGET, values, BUD_ID_COL + " = ?", new String[]{String.valueOf(budgetId)});
-        } else {
-            // Budget doesn't exist, insert a new one
-            cursor.close();
-
-            DateTimeFormatter dtf = null;
-            String currentDate;
-
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                ZonedDateTime zoneDt = ZonedDateTime.now();
-                currentDate = dtf.format(zoneDt);
+                result = db.update(TABLE_TOTAL_BUDGET, values, whereClause, whereArgs);
             } else {
-                currentDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
+                // Insert new total budget
+                cursor.close();
+
+                ContentValues values = new ContentValues();
+                values.put(TOT_USER_ID_COL, userId);
+                values.put(TOT_AMOUNT_COL, amount);
+                values.put(TOT_PERIOD_COL, period);
+                values.put(TOT_START_DATE_COL, startDate);
+                if (endDate != null && !endDate.isEmpty()) {
+                    values.put(TOT_END_DATE_COL, endDate);
+                }
+                values.put(TOT_CREATED_AT, currentDate);
+                values.put(TOT_UPDATED_AT, currentDate);
+
+                result = db.insert(TABLE_TOTAL_BUDGET, null, values);
             }
-
-            ContentValues values = new ContentValues();
-            values.put(BUD_USER_ID_COL, userId);
-            values.put(BUD_CAT_ID_COL, categoryId);
-            values.put(BUD_AMOUNT_COL, amount);
-            values.put(BUD_PERIOD_COL, period);
-            values.put(BUD_START_DATE_COL, startDate);
-
-            if (endDate != null && !endDate.isEmpty()) {
-                values.put(BUD_END_DATE_COL, endDate);
-            }
-
-            values.put(BUD_CREATED_AT, currentDate);
-            values.put(BUD_UPDATED_AT, currentDate);
-
-            result = db.insert(TABLE_BUDGET, null, values);
+        } catch (Exception e) {
+            Log.e(TAG, "Error inserting/updating total budget: " + e.getMessage());
+        } finally {
+            db.close();
         }
 
-        db.close();
         return result;
     }
 
+    @SuppressLint("Range")
+    public double getTotalBudget(int userId, String period) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        double totalBudget = 0;
 
+        try {
+            // Check if the table exists first
+            Cursor tableCheck = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='total_budget'",
+                    null
+            );
+            boolean tableExists = tableCheck.moveToFirst();
+            tableCheck.close();
+
+            if (tableExists) {
+                String query = "SELECT " + TOT_AMOUNT_COL + " FROM " + TABLE_TOTAL_BUDGET +
+                        " WHERE " + TOT_USER_ID_COL + " = ? AND " +
+                        TOT_PERIOD_COL + " = ? " +
+                        "ORDER BY " + TOT_ID_COL + " DESC LIMIT 1";
+
+                Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(userId), period});
+
+                if (cursor.moveToFirst()) {
+                    totalBudget = cursor.getDouble(cursor.getColumnIndex(TOT_AMOUNT_COL));
+                }
+
+                cursor.close();
+            }
+        } catch (Exception e) {
+            Log.e("ExpenseDb", "Error getting total budget: " + e.getMessage());
+        } finally {
+            db.close();
+        }
+
+        return totalBudget;
+    }
+
+    // Method to check if category budget is within limits of total budget
+    public boolean validateCategoryBudget(int userId, double newBudgetAmount) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        boolean isValid = true;
+
+        try {
+            // Check if total_budget table exists
+            Cursor tableCheck = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='total_budget'",
+                    null
+            );
+            boolean tableExists = tableCheck.moveToFirst();
+            tableCheck.close();
+
+            if (!tableExists) {
+                // If table doesn't exist, allow any budget (no constraint)
+                db.close();
+                return true;
+            }
+
+            // Get total budget
+            double totalBudget = getTotalBudget(userId, "monthly");
+
+            // If no total budget is set, allow any category budget
+            if (totalBudget <= 0) {
+                db.close();
+                return true;
+            }
+
+            // Get sum of existing category budgets excluding the current category
+            String query = "SELECT SUM(" + BUD_AMOUNT_COL + ") as total FROM " + TABLE_BUDGET +
+                    " WHERE " + BUD_USER_ID_COL + " = ?";
+
+            Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
+
+            double currentTotalCategoryBudgets = 0;
+            if (cursor.moveToFirst()) {
+                @SuppressLint("Range") double sum = cursor.getDouble(cursor.getColumnIndex("total"));
+                currentTotalCategoryBudgets = sum;
+            }
+
+            cursor.close();
+
+            // Check if adding this budget would exceed the total budget
+            isValid = (currentTotalCategoryBudgets + newBudgetAmount) <= totalBudget;
+        } catch (Exception e) {
+            Log.e("ExpenseDb", "Error validating category budget: " + e.getMessage());
+            isValid = true; // Allow budget if there's an error checking
+        } finally {
+            db.close();
+        }
+
+        return isValid;
+    }
+
+    // Method to check category balance before adding expense
+    public boolean checkCategoryBudgetBalance(int userId, int categoryId, double expenseAmount) {
+        if (categoryId == -1) return true; // Special case for "All Categories"
+
+        SQLiteDatabase db = this.getReadableDatabase();
+        boolean hasBalance = true;
+
+        try {
+            // Check if total_budget table exists
+            Cursor tableCheck = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='total_budget'",
+                    null
+            );
+            boolean tableExists = tableCheck.moveToFirst();
+            tableCheck.close();
+
+            if (!tableExists) {
+                // If budget features aren't enabled yet, allow all expenses
+                return true;
+            }
+
+            // Rest of the method remains the same...
+            // Get current month in format YYYY-MM
+            Calendar cal = Calendar.getInstance();
+            String currentMonth = String.format(Locale.getDefault(), "%d-%02d",
+                    cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1);
+
+            // Get category budget amount
+            String budgetQuery = "SELECT " + BUD_AMOUNT_COL + " FROM " + TABLE_BUDGET +
+                    " WHERE " + BUD_USER_ID_COL + " = ? AND " +
+                    BUD_CAT_ID_COL + " = ?";
+
+            Cursor budgetCursor = db.rawQuery(budgetQuery,
+                    new String[]{String.valueOf(userId), String.valueOf(categoryId)});
+
+            double budgetAmount = 0;
+            if (budgetCursor.moveToFirst()) {
+                @SuppressLint("Range") double amount = budgetCursor.getDouble(budgetCursor.getColumnIndex(BUD_AMOUNT_COL));
+                budgetAmount = amount;
+            }
+            budgetCursor.close();
+
+            // Get current spending for this category in this month
+            double spent = getTotalExpensesByCategoryAndMonth(userId, categoryId, currentMonth);
+
+            // Check if adding this expense would exceed the category budget
+            hasBalance = (spent + expenseAmount) <= budgetAmount;
+        } catch (Exception e) {
+            Log.e("ExpenseDb", "Error checking category budget balance: " + e.getMessage());
+            hasBalance = true; // Allow expense if error checking
+        } finally {
+            db.close();
+        }
+
+        return hasBalance;
+    }
+
+    // Helper method to get remaining budget amount for a category
+    public double getRemainingCategoryBudget(int userId, int categoryId) {
+        // Get current month
+        Calendar cal = Calendar.getInstance();
+        String currentMonth = String.format(Locale.getDefault(), "%d-%02d",
+                cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1);
+
+        // Get category budget
+        double budget = 0;
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        try {
+            String query = "SELECT " + BUD_AMOUNT_COL + " FROM " + TABLE_BUDGET +
+                    " WHERE " + BUD_USER_ID_COL + " = ? AND " +
+                    BUD_CAT_ID_COL + " = ?";
+
+            Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(userId), String.valueOf(categoryId)});
+
+            if (cursor.moveToFirst()) {
+                @SuppressLint("Range") double amount = cursor.getDouble(cursor.getColumnIndex(BUD_AMOUNT_COL));
+                budget = amount;
+            }
+            cursor.close();
+
+            // Get expenses for this category
+            double spent = getTotalExpensesByCategoryAndMonth(userId, categoryId, currentMonth);
+
+            return budget - spent;
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting remaining category budget: " + e.getMessage());
+            return 0; // Default to 0 in case of error
+        } finally {
+            db.close();
+        }
+    }
+
+    // Method to get remaining total budget
+    public double getRemainingTotalBudget(int userId) {
+        // Current implementation that could crash:
+        // double totalBudget = getTotalBudget(userId, "monthly");
+        // double totalSpent = getTotalExpensesByMonth(userId, currentMonth);
+        // return totalBudget - totalSpent;
+
+        // Revised implementation with safety check:
+        double totalBudget = 0;
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        try {
+            // Check if table exists first
+            Cursor tableCheck = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='total_budget'",
+                    null
+            );
+            boolean tableExists = tableCheck.moveToFirst();
+            tableCheck.close();
+
+            if (tableExists) {
+                // Only try to get total budget if table exists
+                totalBudget = getTotalBudget(userId, "monthly");
+            }
+
+            // Get current month
+            Calendar cal = Calendar.getInstance();
+            String currentMonth = String.format(Locale.getDefault(), "%d-%02d",
+                    cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1);
+
+            // Get total expenses for this month
+            double totalSpent = getTotalExpensesByMonth(userId, currentMonth);
+
+            db.close();
+            return totalBudget - totalSpent;
+        } catch (Exception e) {
+            Log.e("ExpenseDb", "Error calculating remaining budget: " + e.getMessage());
+            db.close();
+            return 0; // Return 0 as fallback
+        }
+    }
+
+    // Method for updating an existing budget with a specific ID
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public long updateOrInsertBudget(int userId, int categoryId, double amount, String period, String startDate, String endDate) {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        try {
+            // Check if a budget already exists for this user, category, and period
+            String selection = BUD_USER_ID_COL + " = ? AND " +
+                    BUD_CAT_ID_COL + " = ? AND " +
+                    BUD_PERIOD_COL + " = ?";
+            String[] selectionArgs = {String.valueOf(userId), String.valueOf(categoryId), period};
+
+            Cursor cursor = db.query(TABLE_BUDGET, new String[]{BUD_ID_COL}, selection, selectionArgs, null, null, null);
+
+            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            ZonedDateTime zoneDt = ZonedDateTime.now();
+            String currentDate = dtf.format(zoneDt);
+
+            long result;
+            if (cursor.moveToFirst()) {
+                // Budget exists, update it
+                @SuppressLint("Range") int budgetId = cursor.getInt(cursor.getColumnIndex(BUD_ID_COL));
+                cursor.close();
+
+                ContentValues values = new ContentValues();
+                values.put(BUD_AMOUNT_COL, amount);
+                values.put(BUD_START_DATE_COL, startDate);
+                if (endDate != null && !endDate.isEmpty()) {
+                    values.put(BUD_END_DATE_COL, endDate);
+                }
+                values.put(BUD_UPDATED_AT, currentDate);
+
+                String whereClause = BUD_ID_COL + " = ?";
+                String[] whereArgs = {String.valueOf(budgetId)};
+
+                result = db.update(TABLE_BUDGET, values, whereClause, whereArgs);
+            } else {
+                // Budget doesn't exist, insert a new one
+                cursor.close();
+
+                ContentValues values = new ContentValues();
+                values.put(BUD_USER_ID_COL, userId);
+                values.put(BUD_CAT_ID_COL, categoryId);
+                values.put(BUD_AMOUNT_COL, amount);
+                values.put(BUD_PERIOD_COL, period);
+                values.put(BUD_START_DATE_COL, startDate);
+                if (endDate != null && !endDate.isEmpty()) {
+                    values.put(BUD_END_DATE_COL, endDate);
+                }
+                values.put(BUD_CREATED_AT, currentDate);
+                values.put(BUD_UPDATED_AT, currentDate);
+
+                result = db.insert(TABLE_BUDGET, null, values);
+            }
+
+            return result;
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating/inserting budget: " + e.getMessage());
+            return -1;
+        } finally {
+            db.close();
+        }
+    }
 }

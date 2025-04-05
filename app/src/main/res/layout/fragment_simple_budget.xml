@@ -9,12 +9,13 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Set Monthly Budget"
+        android:text="Manage Your Budget"
         android:textSize="24sp"
         android:textStyle="bold"
         android:gravity="center"
-        android:layout_marginBottom="24dp"/>
+        android:layout_marginBottom="16dp"/>
 
+    <!-- Total Budget Card -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -28,27 +29,113 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <EditText
-                android:id="@+id/etBudgetAmount"
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Budget Amount"
+                android:text="Total Monthly Budget"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Current Total Budget:"/>
+
+                <TextView
+                    android:id="@+id/tvCurrentTotalBudget"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="$0.00"
+                    android:textStyle="bold"
+                    android:textColor="#4CAF50"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Remaining Total Budget:"/>
+
+                <TextView
+                    android:id="@+id/tvRemainingTotalBudget"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="$0.00"
+                    android:textStyle="bold"
+                    android:textColor="#4CAF50"/>
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/etTotalBudgetAmount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter total budget amount"
                 android:inputType="numberDecimal"
                 android:layout_marginBottom="16dp"/>
 
-            <EditText
-                android:id="@+id/etBudgetDescription"
+            <Button
+                android:id="@+id/btnSetTotalBudget"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Description (Optional)"
-                android:inputType="text"
-                android:layout_marginBottom="24dp"/>
+                android:text="SET TOTAL BUDGET" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Category Budget Card -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Allocate Budget to Category"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp"/>
+
+            <Spinner
+                android:id="@+id/spinnerBudgetCategory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etCategoryBudgetAmount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter category budget amount"
+                android:inputType="numberDecimal"
+                android:layout_marginBottom="16dp"/>
 
             <Button
-                android:id="@+id/btnSetBudget"
+                android:id="@+id/btnSetCategoryBudget"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="SET BUDGET" />
+                android:text="ALLOCATE TO CATEGORY" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
@@ -56,7 +143,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Your Budgets"
+        android:text="Category Budgets"
         android:textSize="18sp"
         android:textStyle="bold"
         android:layout_marginBottom="8dp"/>
@@ -65,7 +152,7 @@
         android:id="@+id/tvNoBudgets"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No budgets set yet"
+        android:text="No category budgets set yet"
         android:gravity="center"
         android:padding="16dp"
         android:visibility="gone"/>
