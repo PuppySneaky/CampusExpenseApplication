@@ -1,6 +1,7 @@
 package com.example.campusexpensemanagerse06304;
 
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -8,6 +9,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
@@ -30,11 +34,17 @@ import com.example.campusexpensemanagerse06304.model.Expense;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 public class SimpleExpensesFragment extends Fragment implements RefreshableFragment {
+
+    private Menu actionMenu;
+    private MenuItem deleteMenuItem;
+    private AlertDialog editDialog;
+
     private static final String TAG = "SimpleExpensesFragment";
 
     private EditText etAmount, etDescription;
@@ -48,10 +58,15 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
     private ExpenseDb expenseDb;
     private int userId = -1;
 
+
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_simple_expense, container, false);
+
+        // Enable options menu for multi-select
+        setHasOptionsMenu(true);
 
         etAmount = view.findViewById(R.id.etExpenseAmount);
         etDescription = view.findViewById(R.id.etExpenseDescription);
@@ -76,9 +91,29 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         loadCategories();
 
         // Setup RecyclerView
+        recyclerExpenses.setLayoutManager(new LinearLayoutManager(getContext()));
         expenseList = new ArrayList<>();
         expenseAdapter = new SimpleExpenseAdapter(getContext(), expenseList);
-        recyclerExpenses.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        // IMPORTANT: Set the listener right after creating the adapter
+        expenseAdapter.setOnExpenseActionListener(new SimpleExpenseAdapter.OnExpenseActionListener() {
+            @Override
+            public void onEditExpense(Expense expense) {
+                showEditExpenseDialog(expense);
+            }
+
+            @Override
+            public void onDeleteExpense(Expense expense) {
+                showDeleteConfirmationDialog(expense);
+            }
+
+            @Override
+            public void onMultiDeleteExpenses(List<Expense> expenses) {
+                showMultiDeleteConfirmationDialog(expenses);
+            }
+        });
+
+        // Set the adapter to the RecyclerView
         recyclerExpenses.setAdapter(expenseAdapter);
 
         // Load expenses
@@ -95,6 +130,287 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
 
         return view;
     }
+
+
+    // Override these methods to add the action menu for multi-select
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_expense_actions, menu);
+        this.actionMenu = menu;
+        this.deleteMenuItem = menu.findItem(R.id.action_delete_selected);
+        updateMenuVisibility();
+        super.onCreateOptionsMenu(menu, inflater);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_delete_selected) {
+            List<Expense> selectedExpenses = expenseAdapter.getSelectedExpenses();
+            if (!selectedExpenses.isEmpty()) {
+                showMultiDeleteConfirmationDialog(selectedExpenses);
+            }
+            return true;
+        } else if (item.getItemId() == R.id.action_cancel_selection) {
+            expenseAdapter.toggleMultiSelectMode();
+            updateMenuVisibility();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+
+    // Add this method to update menu visibility
+    private void updateMenuVisibility() {
+        if (actionMenu != null) {
+            boolean showMenu = expenseAdapter.isMultiSelectMode();
+            actionMenu.findItem(R.id.action_delete_selected).setVisible(showMenu);
+            actionMenu.findItem(R.id.action_cancel_selection).setVisible(showMenu);
+
+            // Update the title to show selection count
+            if (showMenu) {
+                int count = expenseAdapter.getSelectedItemCount();
+                getActivity().setTitle(count + " Selected");
+            } else {
+                getActivity().setTitle("Expenses");
+            }
+        }
+    }
+
+
+    private void showEditExpenseDialog(Expense expense) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Edit Expense");
+
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_edit_expense, null);
+        builder.setView(dialogView);
+
+        // Find views
+        EditText etAmount = dialogView.findViewById(R.id.etEditAmount);
+        EditText etDescription = dialogView.findViewById(R.id.etEditDescription);
+        Spinner spinnerCategory = dialogView.findViewById(R.id.spinnerEditCategory);
+        TextView tvDate = dialogView.findViewById(R.id.tvEditDate);
+
+        // Set up category spinner
+        ArrayAdapter<Category> adapter = new ArrayAdapter<>(
+                getContext(), android.R.layout.simple_spinner_item, categoryList);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerCategory.setAdapter(adapter);
+
+        // Set values from the expense
+        double originalAmount = expense.getAmount();
+        etAmount.setText(String.format(Locale.getDefault(), "%.2f", originalAmount));
+        etDescription.setText(expense.getDescription());
+        tvDate.setText(new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(expense.getDate()));
+
+        // Set selected category
+        int originalCategoryId = expense.getCategoryId();
+        int originalCategoryPosition = 0;
+        for (int i = 0; i < categoryList.size(); i++) {
+            if (categoryList.get(i).getId() == originalCategoryId) {
+                spinnerCategory.setSelection(i);
+                originalCategoryPosition = i;
+                break;
+            }
+        }
+
+        // Store original category position for later comparison
+        final int finalOriginalCategoryPosition = originalCategoryPosition;
+
+        // Set date picker
+        tvDate.setOnClickListener(v -> {
+            Calendar c = Calendar.getInstance();
+            c.setTime(expense.getDate());
+
+            DatePickerDialog datePickerDialog = new DatePickerDialog(getContext(),
+                    (view, year, month, dayOfMonth) -> {
+                        Calendar newDate = Calendar.getInstance();
+                        newDate.set(year, month, dayOfMonth);
+                        tvDate.setText(new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                .format(newDate.getTime()));
+                    },
+                    c.get(Calendar.YEAR),
+                    c.get(Calendar.MONTH),
+                    c.get(Calendar.DAY_OF_MONTH));
+            datePickerDialog.show();
+        });
+
+        builder.setPositiveButton("Save", null); // We'll set this later
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+        editDialog = builder.create();
+        editDialog.show();
+
+        // Override positive button to validate input
+        editDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            // Validate input
+            if (etAmount.getText().toString().trim().isEmpty()) {
+                etAmount.setError("Please enter an amount");
+                return;
+            }
+
+            try {
+                double newAmount = Double.parseDouble(etAmount.getText().toString());
+                if (newAmount <= 0) {
+                    etAmount.setError("Amount must be greater than zero");
+                    return;
+                }
+
+                // Get values
+                String description = etDescription.getText().toString();
+                if (description.isEmpty()) {
+                    description = "Expense";
+                }
+
+                Category selectedCategory = (Category) spinnerCategory.getSelectedItem();
+                int categoryId = selectedCategory.getId();
+                String dateStr = tvDate.getText().toString();
+
+                // Check if the category has changed
+                boolean categoryChanged = categoryId != originalCategoryId;
+
+                // Check budget constraints ONLY if:
+                // 1. Amount has increased OR
+                // 2. Category has changed
+                if (newAmount > originalAmount || categoryChanged) {
+                    // Calculate available budget for the selected category
+
+                    // 1. Get the budget limit for this category
+                    double categoryBudget = 0;
+                    List<Budget> budgets = expenseDb.getBudgetsByUser(userId);
+                    for (Budget budget : budgets) {
+                        if (budget.getCategoryId() == categoryId) {
+                            categoryBudget = budget.getAmount();
+                            break;
+                        }
+                    }
+
+                    // 2. Calculate current usage for this category (excluding this expense)
+                    Calendar cal = Calendar.getInstance();
+                    String currentMonth = String.format(Locale.getDefault(), "%d-%02d",
+                            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1);
+
+                    double categoryUsage = expenseDb.getTotalExpensesByCategoryAndMonth(userId, categoryId, currentMonth);
+
+                    // 3. If category hasn't changed, subtract original amount from usage
+                    //    (since it's included in the total but we're replacing it)
+                    if (!categoryChanged) {
+                        categoryUsage -= originalAmount;
+                    }
+
+                    // 4. Check if new amount would exceed budget
+                    if (categoryUsage + newAmount > categoryBudget) {
+                        // Show error dialog with more details
+                        AlertDialog.Builder budgetExceededDialog = new AlertDialog.Builder(getContext());
+                        budgetExceededDialog.setTitle("Budget Limit Exceeded");
+                        budgetExceededDialog.setMessage(
+                                "Updating this expense to $" + String.format(Locale.getDefault(), "%.2f", newAmount) +
+                                        " would exceed your budget for " + selectedCategory.getName() + ".\n\n" +
+                                        "Category Budget: $" + String.format(Locale.getDefault(), "%.2f", categoryBudget) + "\n" +
+                                        "Current Usage: $" + String.format(Locale.getDefault(), "%.2f", categoryUsage) + "\n" +
+                                        "Available: $" + String.format(Locale.getDefault(), "%.2f", categoryBudget - categoryUsage) + "\n\n" +
+                                        "Would you like to increase your budget for this category?"
+                        );
+                        budgetExceededDialog.setPositiveButton("Increase Budget", (dialog, which) -> {
+                            // Navigate to budget tab to adjust budget
+                            if (getActivity() instanceof MenuActivity) {
+                                MenuActivity activity = (MenuActivity) getActivity();
+                                activity.viewPager2.setCurrentItem(2);
+
+                                // Pre-select the category in the budget fragment
+                                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                    Fragment budgetFragment = activity.getViewPagerAdapter().getFragment(2);
+                                    if (budgetFragment instanceof SimpleBudgetFragment) {
+                                        ((SimpleBudgetFragment) budgetFragment).selectCategory(categoryId);
+                                    }
+                                }, 500);
+                            }
+                            editDialog.dismiss();
+                        });
+                        budgetExceededDialog.setNegativeButton("Cancel", null);
+                        budgetExceededDialog.show();
+                        return;
+                    }
+                }
+
+                // Update expense in database
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    int result = expenseDb.updateExpense(
+                            expense.getId(),
+                            categoryId,
+                            newAmount,
+                            description,
+                            dateStr,
+                            expense.getPaymentMethod());
+
+                    if (result > 0) {
+                        Toast.makeText(getContext(), "Expense updated successfully", Toast.LENGTH_SHORT).show();
+                        loadExpenses();
+                        editDialog.dismiss();
+
+                        // Update related fragments
+                        updateHomeFragment();
+                        updateBudgetFragment();
+                    } else {
+                        Toast.makeText(getContext(), "Failed to update expense", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } catch (NumberFormatException e) {
+                etAmount.setError("Invalid amount format");
+            }
+        });
+    }
+
+    private void showDeleteConfirmationDialog(Expense expense) {
+        new AlertDialog.Builder(getContext())
+                .setTitle("Delete Expense")
+                .setMessage("Are you sure you want to delete this expense?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    int result = expenseDb.deleteExpense(expense.getId());
+                    if (result > 0) {
+                        Toast.makeText(getContext(), "Expense deleted successfully", Toast.LENGTH_SHORT).show();
+                        loadExpenses();
+
+                        // Update related fragments
+                        updateHomeFragment();
+                        updateBudgetFragment();
+                    } else {
+                        Toast.makeText(getContext(), "Failed to delete expense", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showMultiDeleteConfirmationDialog(List<Expense> expenses) {
+        new AlertDialog.Builder(getContext())
+                .setTitle("Delete Multiple Expenses")
+                .setMessage("Are you sure you want to delete these " + expenses.size() + " expenses?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    int successCount = 0;
+                    for (Expense expense : expenses) {
+                        int result = expenseDb.deleteExpense(expense.getId());
+                        if (result > 0) {
+                            successCount++;
+                        }
+                    }
+
+                    if (successCount > 0) {
+                        Toast.makeText(getContext(), successCount + " expenses deleted successfully", Toast.LENGTH_SHORT).show();
+                        expenseAdapter.toggleMultiSelectMode();
+                        updateMenuVisibility();
+                        loadExpenses();
+
+                        // Update related fragments
+                        updateHomeFragment();
+                        updateBudgetFragment();
+                    } else {
+                        Toast.makeText(getContext(), "Failed to delete expenses", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
 
     private void loadCategories() {
         categoryList = expenseDb.getAllCategories();
