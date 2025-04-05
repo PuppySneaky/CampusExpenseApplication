@@ -4,4 +4,6 @@
     <color name="white">#FFFFFF</color>
     <color name="transparentBlack">#CC1A1A1A</color>
     <color name="card_background"><![CDATA[@drawable/gradient_sky]]></color>
+    <color name="selectedItem">#E8F0FE</color>
+    <color name="normalItem">#FFFFFF</color>
 </resources>

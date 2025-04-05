@@ -280,6 +280,13 @@ public class RecurringExpenseActivity extends AppCompatActivity {
     // Extract the actual saving logic to a separate method
     @RequiresApi(api = Build.VERSION_CODES.O)
     private void proceedWithSavingRecurringExpense(int categoryId, double amount, String description) {
+        // NEW CODE: Check if this expense would exceed the category budget
+        if (!expenseDb.checkCategoryBudgetBalance(userId, categoryId, amount)) {
+            // Show error dialog with budget details
+            showBudgetExceededDialog(categoryId, amount);
+            return;
+        }
+
         // Get selected frequency
         String frequency = frequencies[spinnerFrequency.getSelectedItemPosition()].toLowerCase();
 
@@ -308,6 +315,51 @@ public class RecurringExpenseActivity extends AppCompatActivity {
         } else {
             Toast.makeText(this, "Failed to add recurring expense", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    // Add this new method to handle the budget exceeded dialog
+    private void showBudgetExceededDialog(int categoryId, double expenseAmount) {
+        // Get category name
+        String categoryName = categoryList.stream().filter(category -> category.getId() == categoryId).findFirst().map(Category::getName).orElse("Selected category");
+
+        // Get remaining budget for this category
+        double remainingBudget = expenseDb.getRemainingCategoryBudget(userId, categoryId);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Budget Limit Exceeded");
+        builder.setMessage("Adding this recurring expense of $" + String.format(Locale.getDefault(), "%.2f", expenseAmount) +
+                " would exceed your budget for " + categoryName + ".\n\n" +
+                "Remaining budget: $" + String.format(Locale.getDefault(), "%.2f", remainingBudget) + "\n\n" +
+                "Would you like to increase your budget for this category?");
+
+        // Add buttons
+        builder.setPositiveButton("Increase Budget", (dialog, which) -> {
+            // Navigate to budget screen
+            Intent intent = new Intent(RecurringExpenseActivity.this, MenuActivity.class);
+            intent.putExtra("ID_USER", userId);
+            intent.putExtra("NAVIGATE_TO_BUDGET", true);
+            intent.putExtra("CATEGORY_ID", categoryId);
+            intent.putExtra("CATEGORY_NAME", categoryName);
+
+            // Store the expense data in shared preferences
+            SharedPreferences prefs = getSharedPreferences("RecurringExpenseData", MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putFloat("PENDING_AMOUNT", (float)expenseAmount);
+            editor.putString("PENDING_DESCRIPTION", etDescription.getText().toString().trim());
+            editor.putInt("PENDING_CATEGORY_ID", categoryId);
+            editor.putString("PENDING_START_DATE", tvStartDate.getText().toString());
+            editor.putString("PENDING_END_DATE", tvEndDate.getText().toString());
+            editor.putInt("PENDING_FREQUENCY", spinnerFrequency.getSelectedItemPosition());
+            editor.putBoolean("HAS_PENDING_DATA", true);
+            editor.apply();
+
+            // Start the activity
+            startActivity(intent);
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+        builder.show();
     }
 
 
