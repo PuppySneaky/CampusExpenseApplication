@@ -136,8 +136,8 @@ public class SimpleHomeFragment extends Fragment {
 
             Log.d(TAG, "Total spent: $" + totalSpent);
 
-            // Get total budget amount
-            double totalBudget = calculateTotalBudget();
+            // Get total budget amount from ExpenseDb
+            double totalBudget = expenseDb.getTotalBudget(userId, "monthly");
             tvTotalBudget.setText(String.format(Locale.getDefault(), "$%.2f", totalBudget));
 
             Log.d(TAG, "Total budget: $" + totalBudget);
@@ -150,6 +150,7 @@ public class SimpleHomeFragment extends Fragment {
 
             // Set budget progress visualization
             int progressPercentage = totalBudget > 0 ? (int)((totalSpent / totalBudget) * 100) : 0;
+            progressPercentage = Math.min(progressPercentage, 100); // Cap at 100%
 
             Log.d(TAG, "Budget progress: " + progressPercentage + "%");
 
@@ -161,8 +162,6 @@ public class SimpleHomeFragment extends Fragment {
                 budgetProgressView.setLayoutParams(params);
 
                 Log.d(TAG, "Set progress bar width: " + params.width + " of " + parentWidth);
-            } else {
-                Log.w(TAG, "Parent width is 0, can't set progress bar width");
             }
 
             // Set color based on percentage
@@ -175,8 +174,6 @@ public class SimpleHomeFragment extends Fragment {
             }
 
             tvBudgetPercentage.setText(String.format(Locale.getDefault(), "%d%%", progressPercentage));
-        } else {
-            Log.w(TAG, "User ID is -1, can't load dashboard data");
         }
     }
 

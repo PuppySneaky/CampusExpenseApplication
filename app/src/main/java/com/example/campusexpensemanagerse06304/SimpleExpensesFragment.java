@@ -348,8 +348,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
                         editDialog.dismiss();
 
                         // Update related fragments
-                        updateHomeFragment();
-                        updateBudgetFragment();
+                        refreshAllData();
                     } else {
                         Toast.makeText(getContext(), "Failed to update expense", Toast.LENGTH_SHORT).show();
                     }
@@ -371,8 +370,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
                         loadExpenses();
 
                         // Update related fragments
-                        updateHomeFragment();
-                        updateBudgetFragment();
+                        refreshAllData();
                     } else {
                         Toast.makeText(getContext(), "Failed to delete expense", Toast.LENGTH_SHORT).show();
                     }
@@ -401,8 +399,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
                         loadExpenses();
 
                         // Update related fragments
-                        updateHomeFragment();
-                        updateBudgetFragment();
+                        refreshAllData();
                     } else {
                         Toast.makeText(getContext(), "Failed to delete expenses", Toast.LENGTH_SHORT).show();
                     }
@@ -432,6 +429,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
             return;
         }
 
+
         double amount;
         try {
             amount = Double.parseDouble(etAmount.getText().toString());
@@ -443,6 +441,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
             etAmount.setError("Invalid amount format");
             return;
         }
+
 
         String description = etDescription.getText().toString().trim();
         if (description.isEmpty()) {
@@ -471,8 +470,6 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
                         // Navigate to budget screen
                         if (getActivity() instanceof MenuActivity) {
                             MenuActivity activity = (MenuActivity) getActivity();
-
-                            // Switch to budget tab (index 2)
                             activity.viewPager2.setCurrentItem(2);
 
                             // Allow layout to be drawn first, then update spinner selection
@@ -493,7 +490,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         }
 
 
-        // NEW CODE: Check if this expense would exceed the category budget
+        // Check if this expense would exceed the category budget
         if (!expenseDb.checkCategoryBudgetBalance(userId, categoryId, amount)) {
             // Show an error dialog with more details
             showBudgetExceededDialog(selectedCategory.getName(), amount);
@@ -505,7 +502,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         String currentDate = dateFormat.format(new Date());
 
         // Save to database with selected category
-        long result = expenseDb.insertExpense(userId, categoryId, amount, description, currentDate, "Cash", false, null);
+/*        long result = expenseDb.insertExpense(userId, categoryId, amount, description, currentDate, "Cash", false, null);
 
         if (result != -1) {
             Log.d(TAG, "Expense added successfully with ID: " + result);
@@ -525,7 +522,7 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         } else {
             Log.e(TAG, "Failed to add expense");
             Toast.makeText(getContext(), "Failed to add expense", Toast.LENGTH_SHORT).show();
-        }
+        }*/
 
         proceedWithSavingExpense(categoryId, amount, description);
     }
@@ -584,39 +581,10 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         builder.show();
     }
 
-    private void updateBudgetFragment() {
+
+    private void refreshAllData() {
         if (getActivity() instanceof MenuActivity) {
-            MenuActivity activity = (MenuActivity) getActivity();
-            ViewPagerAdapter adapter = activity.getViewPagerAdapter();
-
-            Log.d(TAG, "Forcing budget fragment update");
-
-            // Get budget fragment directly
-            Fragment budgetFragment = adapter.getFragment(2);
-            if (budgetFragment instanceof SimpleBudgetFragment) {
-                Log.d(TAG, "Directly calling loadBudgets on SimpleBudgetFragment");
-                ((SimpleBudgetFragment) budgetFragment).loadBudgets();
-            }
-
-            // If we're currently on the Budget tab, force refresh display
-            if (activity.viewPager2.getCurrentItem() == 2) {
-                activity.refreshFragmentAtPosition(2);
-            }
-        }
-    }
-
-    private void updateHomeFragment() {
-        if (getActivity() instanceof MenuActivity) {
-            MenuActivity activity = (MenuActivity) getActivity();
-            ViewPagerAdapter adapter = activity.getViewPagerAdapter();
-
-            Log.d(TAG, "Forcing home fragment update");
-
-            // Update home fragment
-            Fragment homeFragment = adapter.getFragment(0);
-            if (homeFragment instanceof RefreshableFragment) {
-                ((RefreshableFragment) homeFragment).refreshData();
-            }
+            ((MenuActivity) getActivity()).refreshAllDataFragments();
         }
     }
 
@@ -712,10 +680,9 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
             // Refresh the expense list
             loadExpenses();
 
-            // Force update budget information with a small delay
+            // Force update all data
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                updateBudgetFragment();
-                updateHomeFragment();
+                refreshAllData();
             }, 500);
         } else {
             Log.e(TAG, "Failed to add expense");

@@ -346,5 +346,36 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
         return true;
     }
 
+    public void refreshAllDataFragments() {
+        Log.d(TAG, "Refreshing all data fragments");
+
+        // Get ViewPager adapter
+        ViewPagerAdapter adapter = getViewPagerAdapter();
+        if (adapter == null) return;
+
+        // Refresh home fragment
+        Fragment homeFragment = adapter.getFragment(0);
+        if (homeFragment instanceof RefreshableFragment) {
+            ((RefreshableFragment) homeFragment).refreshData();
+        }
+
+        // Refresh expenses fragment
+        Fragment expensesFragment = adapter.getFragment(1);
+        if (expensesFragment instanceof RefreshableFragment) {
+            ((RefreshableFragment) expensesFragment).refreshData();
+        }
+
+        // Refresh budget fragment
+        Fragment budgetFragment = adapter.getFragment(2);
+        if (budgetFragment instanceof RefreshableFragment) {
+            ((RefreshableFragment) budgetFragment).refreshData();
+        }
+
+        // Refresh history fragment
+        Fragment historyFragment = adapter.getFragment(3);
+        if (historyFragment instanceof RefreshableFragment) {
+            ((RefreshableFragment) historyFragment).refreshData();
+        }
+    }
 
 }
