@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -56,6 +57,56 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
         if (intent != null && intent.getExtras() != null) {
             userId = intent.getExtras().getInt("ID_USER", -1);
             Log.d(TAG, "User ID loaded: " + userId);
+        }
+
+// This makes sure the budget fragment is properly accessed and handles errors gracefully
+
+// Check if we need to navigate to budget tab with specific category
+        if (getIntent().getBooleanExtra("NAVIGATE_TO_BUDGET", false)) {
+            try {
+                // Switch to budget tab (index 2)
+                viewPager2.setCurrentItem(2);
+
+                // Get the category ID if provided
+                int categoryId = getIntent().getIntExtra("CATEGORY_ID", -1);
+                String categoryName = getIntent().getStringExtra("CATEGORY_NAME");
+
+                if (categoryId != -1) {
+                    Log.d(TAG, "Navigating to budget tab for category ID: " + categoryId);
+
+                    // Allow layout to be drawn first, then update spinner selection
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        try {
+                            Fragment budgetFragment = viewPagerAdapter.getFragment(2);
+                            if (budgetFragment instanceof SimpleBudgetFragment) {
+                                ((SimpleBudgetFragment) budgetFragment).selectCategory(categoryId);
+
+                                // Show a toast with the category name if available
+                                if (categoryName != null && !categoryName.isEmpty()) {
+                                    Toast.makeText(this,
+                                            "Please set a budget for " + categoryName,
+                                            Toast.LENGTH_LONG).show();
+                                }
+                            } else {
+                                Log.e(TAG, "Budget fragment is not an instance of SimpleBudgetFragment");
+                                Toast.makeText(this,
+                                        "Error: Could not find budget screen. Please set a budget manually.",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error selecting category in budget fragment", e);
+                            Toast.makeText(this,
+                                    "Error: Could not select category. Please set a budget manually.",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    }, 500); // Increased delay for better reliability
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error navigating to budget tab", e);
+                Toast.makeText(this,
+                        "Error navigating to budget screen. Please try again.",
+                        Toast.LENGTH_LONG).show();
+            }
         }
 
         // Initialize main thread handler

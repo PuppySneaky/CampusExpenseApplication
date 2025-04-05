@@ -157,9 +157,12 @@
         android:padding="16dp"
         android:visibility="gone"/>
 
+    <!-- Added android:paddingBottom to ensure content isn't hidden behind nav bar -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerBudgets"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:paddingBottom="60dp"
+        android:clipToPadding="false"/>
 </LinearLayout>

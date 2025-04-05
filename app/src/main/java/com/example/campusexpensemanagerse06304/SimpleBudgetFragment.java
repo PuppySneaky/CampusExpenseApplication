@@ -1,5 +1,6 @@
 package com.example.campusexpensemanagerse06304;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -7,6 +8,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -122,17 +124,55 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
         return view;
     }
 
+    // Then, update the setupCategorySpinner method to filter out categories that already have budgets
     private void setupCategorySpinner() {
         // Load categories from database
         categoryList = expenseDb.getAllCategories();
         Log.d(TAG, "Loaded " + categoryList.size() + " categories");
 
-        // Create adapter for spinner
-        ArrayAdapter<Category> adapter = new ArrayAdapter<>(
-                getContext(), android.R.layout.simple_spinner_item, categoryList);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Create a filtered list of categories that don't already have budgets
+        List<Category> availableCategories = new ArrayList<>();
+        for (Category category : categoryList) {
+            if (!categoryHasBudget(category.getId())) {
+                availableCategories.add(category);
+            }
+        }
 
-        spinnerBudgetCategory.setAdapter(adapter);
+        // If there are no available categories, show a message
+        if (availableCategories.isEmpty()) {
+            // Disable the allocation section
+            spinnerBudgetCategory.setEnabled(false);
+            etCategoryBudgetAmount.setEnabled(false);
+            btnSetCategoryBudget.setEnabled(false);
+
+            // Create an adapter with a placeholder message
+            List<Category> placeholderList = new ArrayList<>();
+            Category placeholder = new Category();
+            placeholder.setId(-1);
+            placeholder.setName("All categories have budgets");
+            placeholderList.add(placeholder);
+
+            ArrayAdapter<Category> adapter = new ArrayAdapter<>(
+                    getContext(), android.R.layout.simple_spinner_item, placeholderList);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinnerBudgetCategory.setAdapter(adapter);
+
+            // Show a toast to explain
+            Toast.makeText(getContext(),
+                    "All categories already have budgets. You can adjust or delete existing budgets.",
+                    Toast.LENGTH_LONG).show();
+        } else {
+            // Enable the allocation section if it was disabled
+            spinnerBudgetCategory.setEnabled(true);
+            etCategoryBudgetAmount.setEnabled(true);
+            btnSetCategoryBudget.setEnabled(true);
+
+            // Create adapter with available categories
+            ArrayAdapter<Category> adapter = new ArrayAdapter<>(
+                    getContext(), android.R.layout.simple_spinner_item, availableCategories);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinnerBudgetCategory.setAdapter(adapter);
+        }
 
         // Set listener to get selected category
         spinnerBudgetCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -141,8 +181,8 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
                 selectedCategory = (Category) parent.getItemAtPosition(position);
                 Log.d(TAG, "Selected category: " + selectedCategory.getName());
 
-                // Show current budget for this category if exists
-                showCurrentCategoryBudget(selectedCategory.getId());
+                // No need to show current budget since this category doesn't have one
+                etCategoryBudgetAmount.setHint("Enter amount for " + selectedCategory.getName());
             }
 
             @Override
@@ -177,6 +217,17 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
             return;
         }
 
+        // NEW CODE: Check if the new total budget is less than the sum of category budgets
+        double totalCategoryBudgets = calculateTotalCategoryBudgetsAllocated();
+        if (amount < totalCategoryBudgets) {
+            // Show error message
+            String errorMsg = "Total budget cannot be less than the sum of category budgets ($" +
+                    String.format(Locale.getDefault(), "%.2f", totalCategoryBudgets) + ")";
+            etTotalBudgetAmount.setError(errorMsg);
+            Toast.makeText(getContext(), errorMsg, Toast.LENGTH_LONG).show();
+            return;
+        }
+
         // Get first day of current month
         Calendar calendar = Calendar.getInstance();
         calendar.set(Calendar.DAY_OF_MONTH, 1);
@@ -207,6 +258,16 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
         }
     }
 
+    // NEW METHOD: Calculate total category budgets allocated
+    private double calculateTotalCategoryBudgetsAllocated() {
+        double total = 0;
+        for (Budget budget : budgetList) {
+            total += budget.getAmount();
+        }
+        Log.d(TAG, "Total category budgets allocated: $" + total);
+        return total;
+    }
+
     private void loadTotalBudget() {
         if (userId == -1 || getContext() == null) {
             return;
@@ -226,10 +287,19 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
         etTotalBudgetAmount.setHint("Enter amount (current: $" + String.format(Locale.getDefault(), "%.2f", totalBudget) + ")");
     }
 
+    // Update the saveCategoryBudget method to double-check
     @RequiresApi(api = Build.VERSION_CODES.O)
     private void saveCategoryBudget() {
         if (userId == -1 || selectedCategory == null) {
             Toast.makeText(getContext(), "Please select a category", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Extra check to make sure the category doesn't already have a budget
+        if (categoryHasBudget(selectedCategory.getId())) {
+            Toast.makeText(getContext(),
+                    "This category already has a budget. Please adjust the existing budget instead.",
+                    Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -251,9 +321,39 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
             return;
         }
 
-        // Check if this would exceed the total budget
-        if (!expenseDb.validateCategoryBudget(userId, amount)) {
-            Toast.makeText(getContext(), "This would exceed your total budget. Please set a lower amount or increase your total budget.", Toast.LENGTH_LONG).show();
+        // Get total budget
+        double totalBudget = expenseDb.getTotalBudget(userId, "monthly");
+        if (totalBudget <= 0) {
+            Toast.makeText(getContext(), "Please set a total budget first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Calculate how much is already allocated to other categories
+        double otherCategoriesTotal = 0;
+        double currentCategoryBudget = 0;
+        for (Budget budget : budgetList) {
+            if (budget.getCategoryId() == selectedCategory.getId()) {
+                // Remember current budget for this category if it exists
+                currentCategoryBudget = budget.getAmount();
+            } else {
+                // Sum up budgets for other categories
+                otherCategoriesTotal += budget.getAmount();
+            }
+        }
+
+        // Calculate available budget (total budget - other categories + current category)
+        double availableBudget = totalBudget - otherCategoriesTotal;
+
+        // If we're updating an existing category budget, add its current amount to available
+        availableBudget += currentCategoryBudget;
+
+        // Check if the new amount would exceed available budget
+        if (amount > availableBudget) {
+            String errorMsg = "Amount exceeds available budget ($" +
+                    String.format(Locale.getDefault(), "%.2f", availableBudget) +
+                    "). Please enter a lower amount or increase your total budget.";
+            etCategoryBudgetAmount.setError(errorMsg);
+            Toast.makeText(getContext(), errorMsg, Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -306,12 +406,7 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
 
     private void checkCategoryBudgetsAgainstTotal() {
         double totalBudget = expenseDb.getTotalBudget(userId, "monthly");
-        double allocatedBudget = 0;
-
-        // Calculate total allocated to categories
-        for (Budget budget : budgetList) {
-            allocatedBudget += budget.getAmount();
-        }
+        double allocatedBudget = calculateTotalCategoryBudgetsAllocated();
 
         if (allocatedBudget > totalBudget) {
             // Alert user that category budgets exceed total
@@ -386,6 +481,7 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
         }
     }
 
+    // Finally, update onResume to refresh the spinner when returning to this fragment
     @Override
     public void onResume() {
         super.onResume();
@@ -393,6 +489,8 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
         // Refresh budget data when fragment becomes visible
         loadTotalBudget();
         loadBudgets();
+        // Refresh category spinner to filter out categories with budgets
+        setupCategorySpinner();
     }
 
     @Override
@@ -404,4 +502,137 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
             loadBudgets();
         }
     }
+
+    /**
+     * Checks if a category already has a budget allocated
+     * @param categoryId The category ID to check
+     * @return true if the category already has a budget, false otherwise
+     */
+    private boolean categoryHasBudget(int categoryId) {
+        for (Budget budget : budgetList) {
+            if (budget.getCategoryId() == categoryId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    // Add this method to SimpleBudgetFragment.java to allow selecting a specific category
+    public boolean selectCategory(int categoryId) {
+        try {
+            Log.d(TAG, "Attempting to select category with ID: " + categoryId);
+
+            // Make sure the fragment is attached to context
+            if (!isAdded() || getContext() == null) {
+                Log.e(TAG, "Fragment not attached to context");
+                return false;
+            }
+
+            // Make sure the spinner has adapter
+            if (spinnerBudgetCategory == null || spinnerBudgetCategory.getAdapter() == null) {
+                Log.e(TAG, "Spinner or adapter is null");
+                return false;
+            }
+
+            // First check if the category is already in the list
+            boolean found = false;
+            int positionToSelect = -1;
+
+            for (int i = 0; i < spinnerBudgetCategory.getCount(); i++) {
+                try {
+                    Object item = spinnerBudgetCategory.getItemAtPosition(i);
+                    if (item instanceof Category) {
+                        Category category = (Category) item;
+                        if (category.getId() == categoryId) {
+                            positionToSelect = i;
+                            found = true;
+                            Log.d(TAG, "Found category at position " + i + ": " + category.getName());
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error checking category at position " + i, e);
+                }
+            }
+
+            // If category found, select it
+            if (found && positionToSelect >= 0) {
+                spinnerBudgetCategory.setSelection(positionToSelect);
+
+                // Focus on the amount field for easier input
+                if (etCategoryBudgetAmount != null) {
+                    etCategoryBudgetAmount.requestFocus();
+
+                    // Show keyboard
+                    try {
+                        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.showSoftInput(etCategoryBudgetAmount, InputMethodManager.SHOW_IMPLICIT);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error showing keyboard", e);
+                    }
+                }
+
+                return true;
+            } else {
+                // If category not found, it might already have a budget
+                // Refresh the category list to make sure we have the latest data
+                Log.d(TAG, "Category not found in spinner, refreshing data");
+                loadBudgets(); // Refresh the budget list
+                setupCategorySpinner(); // Refresh the spinner
+
+                // Try one more time with refreshed data
+                for (int i = 0; i < spinnerBudgetCategory.getCount(); i++) {
+                    try {
+                        Object item = spinnerBudgetCategory.getItemAtPosition(i);
+                        if (item instanceof Category) {
+                            Category category = (Category) item;
+                            if (category.getId() == categoryId) {
+                                spinnerBudgetCategory.setSelection(i);
+                                if (etCategoryBudgetAmount != null) {
+                                    etCategoryBudgetAmount.requestFocus();
+                                }
+                                Log.d(TAG, "Found category on second attempt");
+                                return true;
+                            }
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error checking category at position " + i + " on second attempt", e);
+                    }
+                }
+
+                // If we got here, category wasn't found even after refresh
+                Log.e(TAG, "Category not found even after refresh");
+
+                // Check if it already has a budget
+                for (Budget budget : budgetList) {
+                    if (budget.getCategoryId() == categoryId) {
+                        // It already has a budget, show a message
+                        Toast.makeText(getContext(),
+                                "This category already has a budget. You can adjust it below.",
+                                Toast.LENGTH_LONG).show();
+                        return false;
+                    }
+                }
+
+                // Otherwise, let the user know
+                Toast.makeText(getContext(),
+                        "Could not find the selected category. Please select one manually.",
+                        Toast.LENGTH_LONG).show();
+                return false;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in selectCategory", e);
+            if (getContext() != null) {
+                Toast.makeText(getContext(),
+                        "Error selecting category: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+            return false;
+        }
+    }
+
+
 }

@@ -61,29 +61,55 @@
         android:inputType="numberDecimal"
         android:layout_marginBottom="16dp"/>
 
-    <!-- Information about total budget -->
+    <!-- Budget information section with improved styling -->
     <TextView
-        android:id="@+id/tvTotalBudgetInfo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Your total monthly budget: $1000.00"
-        android:textSize="14sp"
-        android:layout_marginBottom="8dp"/>
-
-    <TextView
-        android:id="@+id/tvAllocatedBudgetInfo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Already allocated: $800.00"
-        android:textSize="14sp"
-        android:layout_marginBottom="8dp"/>
-
-    <TextView
-        android:id="@+id/tvAvailableBudgetInfo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Available to allocate: $200.00"
-        android:textSize="14sp"
+        android:text="Budget Status"
         android:textStyle="bold"
+        android:textSize="16sp"
         android:layout_marginBottom="8dp"/>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:background="#F5F5F5">
+
+            <TextView
+                android:id="@+id/tvTotalBudgetInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Your total monthly budget: $1000.00"
+                android:textSize="14sp"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
+                android:id="@+id/tvAllocatedBudgetInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Already allocated: $800.00"
+                android:textSize="14sp"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
+                android:id="@+id/tvAvailableBudgetInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Maximum for this category: $200.00"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#4CAF50"
+                android:layout_marginBottom="4dp"/>
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Removed the button area from here -->
 </LinearLayout>

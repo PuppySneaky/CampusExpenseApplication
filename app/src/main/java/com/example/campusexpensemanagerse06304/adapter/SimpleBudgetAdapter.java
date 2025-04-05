@@ -153,14 +153,15 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
         double currentSpent = budget.getSpent();
         double currentPercentOfTotal = totalBudget > 0 ? (currentAmount / totalBudget) * 100 : 0;
 
-        // Calculate allocated and available budget
-        double allocatedBudget = 0;
+        // Calculate available budget using our helper method
+        double availableBudget = calculateAvailableBudget(budget);
+        double maxAllowable = availableBudget + currentAmount;
+
+        // Calculate total allocated across ALL categories
+        double totalAllocated = 0;
         for (Budget b : budgetList) {
-            if (b.getId() != budget.getId()) { // Exclude current budget
-                allocatedBudget += b.getAmount();
-            }
+            totalAllocated += b.getAmount();
         }
-        double availableBudget = totalBudget - allocatedBudget;
 
         // Set initial values
         etNewAmount.setHint("Current: $" + String.format(Locale.getDefault(), "%.2f", currentAmount));
@@ -169,21 +170,40 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
         tvTotalBudgetInfo.setText(String.format(Locale.getDefault(),
                 "Your total monthly budget: $%.2f", totalBudget));
         tvAllocatedBudgetInfo.setText(String.format(Locale.getDefault(),
-                "Already allocated to other categories: $%.2f", allocatedBudget));
+                "Total allocated across all categories: $%.2f", totalAllocated));
         tvAvailableBudgetInfo.setText(String.format(Locale.getDefault(),
-                "Available to allocate: $%.2f (plus current $%.2f)",
-                availableBudget, currentAmount));
+                "Maximum for this category: $%.2f",
+                maxAllowable));
 
         // Set initial slider position
         sliderBudgetPercentage.setProgress((int)currentPercentOfTotal);
-        tvSliderValue.setText(String.format(Locale.getDefault(), "%.1f%% of total budget", currentPercentOfTotal));
+        tvSliderValue.setText(String.format(Locale.getDefault(), "%.1f%% of total budget ($%.2f)",
+                currentPercentOfTotal, currentAmount));
+
+        // Calculate the maximum allowable percentage
+        int maxPercentage = totalBudget > 0 ? (int)((maxAllowable / totalBudget) * 100) : 100;
+
+        // Limit slider to maximum available budget
+        sliderBudgetPercentage.setMax(maxPercentage);
 
         // Set up slider change listener
         sliderBudgetPercentage.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
+                    // Ensure progress doesn't exceed max allowable value
+                    if (progress > maxPercentage) {
+                        progress = maxPercentage;
+                        seekBar.setProgress(progress);
+                    }
+
                     double amount = (progress / 100.0) * totalBudget;
+
+                    // Ensure amount doesn't exceed max allowable
+                    if (amount > maxAllowable) {
+                        amount = maxAllowable;
+                    }
+
                     tvSliderValue.setText(String.format(Locale.getDefault(),
                             "%.1f%% of total budget ($%.2f)", (double)progress, amount));
 
@@ -212,6 +232,15 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
                 try {
                     if (!s.toString().isEmpty()) {
                         double amount = Double.parseDouble(s.toString());
+
+                        // Check if amount exceeds max allowable
+                        if (amount > maxAllowable) {
+                            // Set error immediately on the EditText
+                            etNewAmount.setError("Cannot exceed maximum: $" +
+                                    String.format(Locale.getDefault(), "%.2f", maxAllowable));
+                            return;
+                        }
+
                         int percentage = totalBudget > 0 ? (int)((amount / totalBudget) * 100) : 0;
 
                         // Update slider without triggering its listener
@@ -222,6 +251,9 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
                             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                                 if (fromUser) {
                                     double newAmount = (progress / 100.0) * totalBudget;
+                                    if (newAmount > maxAllowable) {
+                                        newAmount = maxAllowable;
+                                    }
                                     tvSliderValue.setText(String.format(Locale.getDefault(),
                                             "%.1f%% of total budget ($%.2f)", (double)progress, newAmount));
 
@@ -276,8 +308,7 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
                     return;
                 }
 
-                // Make sure this doesn't exceed available budget + current budget allocation
-                double maxAllowable = availableBudget + currentAmount;
+                // Final check to ensure amount doesn't exceed available budget
                 if (newAmount > maxAllowable) {
                     etNewAmount.setError("This amount exceeds your available budget");
                     Toast.makeText(context,
@@ -397,4 +428,32 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
             btnDelete = itemView.findViewById(R.id.btnDeleteBudget);
         }
     }
+
+    // This method to the SimpleBudgetAdapter class to calculate the correct available budget
+    // considering all other category allocations
+
+    private double calculateAvailableBudget(Budget currentBudget) {
+        int userId = currentBudget.getUserId();
+        double totalBudget = expenseDb.getTotalBudget(userId, "monthly");
+        double totalAllocated = 0;
+
+        // Sum up all allocations EXCEPT the current budget being adjusted
+        for (Budget budget : budgetList) {
+            if (budget.getId() != currentBudget.getId()) {
+                totalAllocated += budget.getAmount();
+            }
+        }
+
+        // Available budget is total budget minus all other allocations
+        double availableBudget = totalBudget - totalAllocated;
+
+        Log.d(TAG, "Total budget: $" + totalBudget);
+        Log.d(TAG, "Total allocated to other categories: $" + totalAllocated);
+        Log.d(TAG, "Available budget for this category: $" + availableBudget);
+        Log.d(TAG, "Current category budget: $" + currentBudget.getAmount());
+
+        return availableBudget;
+    }
+
+
 }

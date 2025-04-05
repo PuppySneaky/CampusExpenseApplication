@@ -24,6 +24,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.campusexpensemanagerse06304.adapter.SimpleExpenseAdapter;
 import com.example.campusexpensemanagerse06304.adapter.ViewPagerAdapter;
 import com.example.campusexpensemanagerse06304.database.ExpenseDb;
+import com.example.campusexpensemanagerse06304.model.Budget;
 import com.example.campusexpensemanagerse06304.model.Category;
 import com.example.campusexpensemanagerse06304.model.Expense;
 
@@ -142,6 +143,40 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         int categoryId = selectedCategory.getId();
         Log.d(TAG, "Selected category: " + selectedCategory.getName() + " (ID: " + categoryId + ")");
 
+
+        // Check if this category has a budget
+        if (!categoryHasBudget(categoryId)) {
+            // Show dialog to prompt user to set up a budget first
+            String finalDescription = description;
+            new AlertDialog.Builder(getContext())
+                    .setTitle("Budget Required")
+                    .setMessage("This category doesn't have a budget yet. Would you like to set one up first?")
+                    .setPositiveButton("Set Budget", (dialog, which) -> {
+                        // Navigate to budget screen
+                        if (getActivity() instanceof MenuActivity) {
+                            MenuActivity activity = (MenuActivity) getActivity();
+
+                            // Switch to budget tab (index 2)
+                            activity.viewPager2.setCurrentItem(2);
+
+                            // Allow layout to be drawn first, then update spinner selection
+                            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                Fragment budgetFragment = activity.getViewPagerAdapter().getFragment(2);
+                                if (budgetFragment instanceof SimpleBudgetFragment) {
+                                    ((SimpleBudgetFragment) budgetFragment).selectCategory(categoryId);
+                                }
+                            }, 300);
+                        }
+                    })
+                    .setNegativeButton("Continue Anyway", (dialog, which) -> {
+                        // Proceed with saving expense
+                        proceedWithSavingExpense(categoryId, amount, finalDescription);
+                    })
+                    .show();
+            return;
+        }
+
+
         // NEW CODE: Check if this expense would exceed the category budget
         if (!expenseDb.checkCategoryBudgetBalance(userId, categoryId, amount)) {
             // Show an error dialog with more details
@@ -175,6 +210,8 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
             Log.e(TAG, "Failed to add expense");
             Toast.makeText(getContext(), "Failed to add expense", Toast.LENGTH_SHORT).show();
         }
+
+        proceedWithSavingExpense(categoryId, amount, description);
     }
 
     // Add this new method to show a detailed budget exceeded dialog
@@ -316,4 +353,60 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
         // Refresh data when fragment becomes visible
         refreshData();
     }
+
+    // Here's the implementation of the budget check for normal expenses
+// This should be added to the SimpleExpensesFragment.java file
+
+    /**
+     * Checks if the selected category has a budget allocated
+     * @param categoryId The category ID to check
+     * @return true if the category has a budget, false otherwise
+     */
+    private boolean categoryHasBudget(int categoryId) {
+        // Get all budgets for the current user
+        List<Budget> budgets = expenseDb.getBudgetsByUser(userId);
+
+        // Check if any budget matches the selected category
+        for (Budget budget : budgets) {
+            if (budget.getCategoryId() == categoryId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void proceedWithSavingExpense(int categoryId, double amount, String description) {
+        // Get current date
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String currentDate = dateFormat.format(new Date());
+
+        // Save to database with selected category
+        long result = expenseDb.insertExpense(userId, categoryId, amount, description, currentDate, "Cash", false, null);
+
+        if (result != -1) {
+            Log.d(TAG, "Expense added successfully with ID: " + result);
+            Toast.makeText(getContext(), "Expense added successfully", Toast.LENGTH_SHORT).show();
+            // Clear input fields
+            etAmount.setText("");
+            etDescription.setText("");
+
+            // Refresh the expense list
+            loadExpenses();
+
+            // Force update budget information with a small delay
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                updateBudgetFragment();
+                updateHomeFragment();
+            }, 500);
+        } else {
+            Log.e(TAG, "Failed to add expense");
+            Toast.makeText(getContext(), "Failed to add expense", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+
 }

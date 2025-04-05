@@ -1,9 +1,12 @@
 package com.example.campusexpensemanagerse06304;
 
+import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -20,6 +23,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.campusexpensemanagerse06304.adapter.RecurringExpenseAdapter;
 import com.example.campusexpensemanagerse06304.database.ExpenseDb;
+import com.example.campusexpensemanagerse06304.model.Budget;
 import com.example.campusexpensemanagerse06304.model.Category;
 import com.example.campusexpensemanagerse06304.model.RecurringExpense;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -178,6 +182,9 @@ public class RecurringExpenseActivity extends AppCompatActivity {
         datePickerDialog.show();
     }
 
+// Modify the saveRecurringExpense method to check for category budget before saving
+// Fix for the RecurringExpenseActivity to prevent crashes when navigating to budget screen
+
     @RequiresApi(api = Build.VERSION_CODES.O)
     private void saveRecurringExpense() {
         // Validate input fields
@@ -212,6 +219,67 @@ public class RecurringExpenseActivity extends AppCompatActivity {
         Category selectedCategory = (Category) spinnerCategory.getSelectedItem();
         int categoryId = selectedCategory.getId();
 
+        // Check if this category has a budget
+        if (!categoryHasBudget(categoryId)) {
+            // Show dialog to prompt user to set up a budget first
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Budget Required");
+            builder.setMessage("This category doesn't have a budget yet. Would you like to set one up first?");
+
+            // Store the selected values in class variables so we can access them later
+            final double finalAmount = amount;
+            final String finalDescription = description;
+            final int finalCategoryId = categoryId;
+
+            builder.setPositiveButton("Set Budget", (dialog, which) -> {
+                try {
+                    // Navigate to budget screen using safer navigation
+                    Intent intent = new Intent(RecurringExpenseActivity.this, MenuActivity.class);
+                    intent.putExtra("ID_USER", userId);
+                    intent.putExtra("NAVIGATE_TO_BUDGET", true);
+                    intent.putExtra("CATEGORY_ID", finalCategoryId);
+                    intent.putExtra("CATEGORY_NAME", selectedCategory.getName());
+
+                    // Store these values in shared preferences so we can retrieve them when returning
+                    SharedPreferences prefs = getSharedPreferences("RecurringExpenseData", MODE_PRIVATE);
+                    SharedPreferences.Editor editor = prefs.edit();
+                    editor.putFloat("PENDING_AMOUNT", (float)finalAmount);
+                    editor.putString("PENDING_DESCRIPTION", finalDescription);
+                    editor.putInt("PENDING_CATEGORY_ID", finalCategoryId);
+                    editor.putString("PENDING_START_DATE", tvStartDate.getText().toString());
+                    editor.putString("PENDING_END_DATE", tvEndDate.getText().toString());
+                    editor.putInt("PENDING_FREQUENCY", spinnerFrequency.getSelectedItemPosition());
+                    editor.putBoolean("HAS_PENDING_DATA", true);
+                    editor.apply();
+
+                    // Start the activity
+                    startActivity(intent);
+                    // Finish so we don't have multiple instances of this activity
+                    // finish(); <- Don't finish, as we want to return to this screen
+                } catch (Exception e) {
+                    Log.e("RecurringExpense", "Error navigating to budget screen", e);
+                    Toast.makeText(RecurringExpenseActivity.this,
+                            "Error navigating to budget screen: " + e.getMessage(),
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+
+            builder.setNegativeButton("Continue Anyway", (dialog, which) -> {
+                // Proceed with saving recurring expense
+                proceedWithSavingRecurringExpense(finalCategoryId, finalAmount, finalDescription);
+            });
+
+            builder.show();
+            return;
+        }
+
+        // If category has budget, proceed with saving
+        proceedWithSavingRecurringExpense(categoryId, amount, description);
+    }
+
+    // Extract the actual saving logic to a separate method
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void proceedWithSavingRecurringExpense(int categoryId, double amount, String description) {
         // Get selected frequency
         String frequency = frequencies[spinnerFrequency.getSelectedItemPosition()].toLowerCase();
 
@@ -241,6 +309,7 @@ public class RecurringExpenseActivity extends AppCompatActivity {
             Toast.makeText(this, "Failed to add recurring expense", Toast.LENGTH_SHORT).show();
         }
     }
+
 
     private void clearForm() {
         etAmount.setText("");
@@ -298,4 +367,86 @@ public class RecurringExpenseActivity extends AppCompatActivity {
             Toast.makeText(this, "Failed to delete recurring expense", Toast.LENGTH_SHORT).show();
         }
     }
+
+    // Add this method to RecurringExpenseActivity.java to check if a category has a budget
+
+    /**
+     * Checks if the selected category has a budget allocated
+     * @param categoryId The category ID to check
+     * @return true if the category has a budget, false otherwise
+     */
+    private boolean categoryHasBudget(int categoryId) {
+        // Get all budgets for the current user
+        List<Budget> budgets = expenseDb.getBudgetsByUser(userId);
+
+        // Check if any budget matches the selected category
+        for (Budget budget : budgets) {
+            if (budget.getCategoryId() == categoryId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // Check if we have pending data from a budget allocation
+        SharedPreferences prefs = getSharedPreferences("RecurringExpenseData", MODE_PRIVATE);
+        boolean hasPendingData = prefs.getBoolean("HAS_PENDING_DATA", false);
+
+        if (hasPendingData) {
+            try {
+                // Retrieve the stored data
+                float amount = prefs.getFloat("PENDING_AMOUNT", 0f);
+                String description = prefs.getString("PENDING_DESCRIPTION", "");
+                int categoryId = prefs.getInt("PENDING_CATEGORY_ID", -1);
+                String startDate = prefs.getString("PENDING_START_DATE", "");
+                String endDate = prefs.getString("PENDING_END_DATE", "");
+                int frequencyPos = prefs.getInt("PENDING_FREQUENCY", 0);
+
+                // Clear the pending data flag
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putBoolean("HAS_PENDING_DATA", false);
+                editor.apply();
+
+                // Check if the category now has a budget
+                if (categoryHasBudget(categoryId)) {
+                    // If it does, proceed with saving
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        proceedWithSavingRecurringExpense(categoryId, amount, description);
+                    }
+                } else {
+                    // Restore the form with the data
+                    for (int i = 0; i < spinnerCategory.getCount(); i++) {
+                        Category category = (Category) spinnerCategory.getItemAtPosition(i);
+                        if (category.getId() == categoryId) {
+                            spinnerCategory.setSelection(i);
+                            break;
+                        }
+                    }
+
+                    spinnerFrequency.setSelection(frequencyPos);
+                    tvStartDate.setText(startDate);
+                    tvEndDate.setText(endDate);
+                    etAmount.setText(String.valueOf(amount));
+                    etDescription.setText(description);
+
+                    // Show the form if it was hidden
+                    formContainer.setVisibility(View.VISIBLE);
+                    fabAddRecurring.setVisibility(View.GONE);
+
+                    Toast.makeText(this,
+                            "Your expense information has been restored. You may continue editing.",
+                            Toast.LENGTH_LONG).show();
+                }
+            } catch (Exception e) {
+                Log.e("RecurringExpense", "Error restoring pending data", e);
+            }
+        }
+    }
+
+
 }
