@@ -13,13 +13,45 @@
         android:textStyle="bold"
         android:layout_marginBottom="16dp"/>
 
+    <!-- Current budget information -->
     <TextView
         android:id="@+id/tvCurrentBudgetInfo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Current budget information and spending"
         android:textStyle="italic"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Slider for percentage of total budget -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Adjust as percentage of total budget:"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"/>
+
+    <SeekBar
+        android:id="@+id/sliderBudgetPercentage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="20"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/tvSliderValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="20% of total budget"
+        android:textAlignment="center"
         android:layout_marginBottom="16dp"/>
+
+    <!-- Direct amount input -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Or enter exact amount:"
+        android:layout_marginBottom="4dp"/>
 
     <EditText
         android:id="@+id/etNewBudgetAmount"

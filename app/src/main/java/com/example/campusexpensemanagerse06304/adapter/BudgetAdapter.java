@@ -140,9 +140,9 @@ public class BudgetAdapter extends RecyclerView.Adapter<BudgetAdapter.BudgetView
             tvSpent = itemView.findViewById(R.id.tvBudgetSpent);
             tvPercentage = itemView.findViewById(R.id.tvBudgetPercentage);
             tvRemaining = itemView.findViewById(R.id.tvBudgetRemaining);
-            tvDateRange = itemView.findViewById(R.id.tvBudgetDateRange);
+
             progressBudget = itemView.findViewById(R.id.progressBudget);
-            ivDelete = itemView.findViewById(R.id.ivDeleteBudget);
+
             vCategoryColor = itemView.findViewById(R.id.vBudgetCategoryColor);
 
             // Set click listeners

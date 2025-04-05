@@ -9,127 +9,159 @@
     app:cardCornerRadius="8dp"
     app:cardElevation="2dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- Category color indicator -->
-        <View
-            android:id="@+id/vBudgetCategoryColor"
-            android:layout_width="4dp"
-            android:layout_height="0dp"
-            android:background="#4CAF50"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <!-- Category and Period -->
-        <TextView
-            android:id="@+id/tvBudgetCategory"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="Food"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintStart_toEndOf="@id/vBudgetCategoryColor"
-            app:layout_constraintTop_toTopOf="parent" />
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/tvBudgetPeriod"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Monthly"
-            android:textSize="14sp"
-            app:layout_constraintBottom_toBottomOf="@id/tvBudgetCategory"
-            app:layout_constraintStart_toEndOf="@id/tvBudgetCategory"
-            app:layout_constraintTop_toTopOf="@id/tvBudgetCategory" />
+            <!-- Category color indicator -->
+            <View
+                android:id="@+id/vBudgetCategoryColor"
+                android:layout_width="8dp"
+                android:layout_height="match_parent"
+                android:background="#4CAF50"
+                android:layout_marginEnd="8dp"/>
 
-        <!-- Budget Amount -->
-        <TextView
-            android:id="@+id/tvBudgetAmount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="$500.00"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@id/ivDeleteBudget"
-            app:layout_constraintTop_toTopOf="parent" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <!-- Category Name -->
+                <TextView
+                    android:id="@+id/tvBudgetCategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Food"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+                <!-- Budget Period -->
+                <TextView
+                    android:id="@+id/tvBudgetPeriod"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Monthly"
+                    android:textSize="12sp"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
+
+            <!-- Amount and Delete -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="end">
+
+                <!-- Budget Amount -->
+                <TextView
+                    android:id="@+id/tvBudgetAmount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="$500.00"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+                <!-- Percentage of Total -->
+                <TextView
+                    android:id="@+id/tvPercentageOfTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="(20% of total)"
+                    android:textSize="12sp"
+                    android:layout_marginTop="2dp"/>
+            </LinearLayout>
+        </LinearLayout>
 
         <!-- Progress Bar -->
         <ProgressBar
             android:id="@+id/progressBudget"
             style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="12dp"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="4dp"
             android:max="100"
-            android:progress="65"
-            app:layout_constraintEnd_toStartOf="@id/tvBudgetPercentage"
-            app:layout_constraintStart_toEndOf="@id/vBudgetCategoryColor"
-            app:layout_constraintTop_toBottomOf="@id/tvBudgetCategory" />
+            android:progress="65"/>
 
-        <!-- Percentage -->
-        <TextView
-            android:id="@+id/tvBudgetPercentage"
-            android:layout_width="wrap_content"
+        <!-- Percentage Text -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="65%"
-            android:textSize="12sp"
-            app:layout_constraintBottom_toBottomOf="@id/progressBudget"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@id/progressBudget" />
+            android:orientation="horizontal">
 
-        <!-- Spent Amount -->
-        <TextView
-            android:id="@+id/tvBudgetSpent"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="6dp"
-            android:text="$325.00 / $500.00"
-            android:textSize="14sp"
-            app:layout_constraintStart_toEndOf="@id/vBudgetCategoryColor"
-            app:layout_constraintTop_toBottomOf="@id/progressBudget" />
+            <!-- Spent/Budget -->
+            <TextView
+                android:id="@+id/tvBudgetSpent"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="$325.00 / $500.00"
+                android:textSize="14sp"/>
+
+            <!-- Percentage -->
+            <TextView
+                android:id="@+id/tvBudgetPercentage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="65%"
+                android:textSize="14sp"/>
+        </LinearLayout>
 
         <!-- Remaining Amount -->
-        <TextView
-            android:id="@+id/tvBudgetRemaining"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="$175.00 remaining"
-            android:textColor="#4CAF50"
-            android:textSize="14sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/progressBudget" />
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
 
-        <!-- Date Range -->
-        <TextView
-            android:id="@+id/tvBudgetDateRange"
-            android:layout_width="wrap_content"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remaining:"
+                android:textSize="14sp"/>
+
+            <TextView
+                android:id="@+id/tvBudgetRemaining"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="$175.00"
+                android:textColor="#4CAF50"
+                android:textSize="14sp"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="6dp"
-            android:text="From Apr 01 to Apr 30"
-            android:textSize="12sp"
-            app:layout_constraintStart_toEndOf="@id/vBudgetCategoryColor"
-            app:layout_constraintTop_toBottomOf="@id/tvBudgetSpent" />
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
 
-        <!-- Delete button -->
-        <ImageView
-            android:id="@+id/ivDeleteBudget"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:padding="2dp"
-            android:src="@android:drawable/ic_menu_delete"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            <Button
+                android:id="@+id/btnAdjustBudget"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Adjust"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp"/>
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
+            <Button
+                android:id="@+id/btnDeleteBudget"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Delete"
+                android:textSize="12sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+    </LinearLayout>
 </androidx.cardview.widget.CardView>

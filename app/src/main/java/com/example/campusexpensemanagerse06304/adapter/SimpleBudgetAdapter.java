@@ -3,6 +3,8 @@ package com.example.campusexpensemanagerse06304.adapter;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,6 +12,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,7 +52,7 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
     @NonNull
     @Override
     public BudgetViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.item_budget, parent, false);
+        View view = LayoutInflater.from(context).inflate(R.layout.budget_item, parent, false);
         return new BudgetViewHolder(view);
     }
 
@@ -135,8 +138,119 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
         builder.setView(dialogView);
 
         // Get dialog views
+        SeekBar sliderBudgetPercentage = dialogView.findViewById(R.id.sliderBudgetPercentage);
+        TextView tvSliderValue = dialogView.findViewById(R.id.tvSliderValue);
         EditText etNewAmount = dialogView.findViewById(R.id.etNewBudgetAmount);
-        etNewAmount.setHint("Current: $" + String.format(Locale.getDefault(), "%.2f", budget.getAmount()));
+        TextView tvCurrentBudgetInfo = dialogView.findViewById(R.id.tvCurrentBudgetInfo);
+        TextView tvTotalBudgetInfo = dialogView.findViewById(R.id.tvTotalBudgetInfo);
+        TextView tvAllocatedBudgetInfo = dialogView.findViewById(R.id.tvAllocatedBudgetInfo);
+        TextView tvAvailableBudgetInfo = dialogView.findViewById(R.id.tvAvailableBudgetInfo);
+
+        // Get important values
+        int userId = budget.getUserId();
+        double totalBudget = expenseDb.getTotalBudget(userId, "monthly");
+        double currentAmount = budget.getAmount();
+        double currentSpent = budget.getSpent();
+        double currentPercentOfTotal = totalBudget > 0 ? (currentAmount / totalBudget) * 100 : 0;
+
+        // Calculate allocated and available budget
+        double allocatedBudget = 0;
+        for (Budget b : budgetList) {
+            if (b.getId() != budget.getId()) { // Exclude current budget
+                allocatedBudget += b.getAmount();
+            }
+        }
+        double availableBudget = totalBudget - allocatedBudget;
+
+        // Set initial values
+        etNewAmount.setHint("Current: $" + String.format(Locale.getDefault(), "%.2f", currentAmount));
+        tvCurrentBudgetInfo.setText(String.format(Locale.getDefault(),
+                "Current budget: $%.2f (Spent: $%.2f)", currentAmount, currentSpent));
+        tvTotalBudgetInfo.setText(String.format(Locale.getDefault(),
+                "Your total monthly budget: $%.2f", totalBudget));
+        tvAllocatedBudgetInfo.setText(String.format(Locale.getDefault(),
+                "Already allocated to other categories: $%.2f", allocatedBudget));
+        tvAvailableBudgetInfo.setText(String.format(Locale.getDefault(),
+                "Available to allocate: $%.2f (plus current $%.2f)",
+                availableBudget, currentAmount));
+
+        // Set initial slider position
+        sliderBudgetPercentage.setProgress((int)currentPercentOfTotal);
+        tvSliderValue.setText(String.format(Locale.getDefault(), "%.1f%% of total budget", currentPercentOfTotal));
+
+        // Set up slider change listener
+        sliderBudgetPercentage.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    double amount = (progress / 100.0) * totalBudget;
+                    tvSliderValue.setText(String.format(Locale.getDefault(),
+                            "%.1f%% of total budget ($%.2f)", (double)progress, amount));
+
+                    // Update the amount field
+                    etNewAmount.setText(String.format(Locale.getDefault(), "%.2f", amount));
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+
+        // Set up amount field change listener
+        etNewAmount.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                try {
+                    if (!s.toString().isEmpty()) {
+                        double amount = Double.parseDouble(s.toString());
+                        int percentage = totalBudget > 0 ? (int)((amount / totalBudget) * 100) : 0;
+
+                        // Update slider without triggering its listener
+                        sliderBudgetPercentage.setOnSeekBarChangeListener(null);
+                        sliderBudgetPercentage.setProgress(percentage);
+                        sliderBudgetPercentage.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                            @Override
+                            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                                if (fromUser) {
+                                    double newAmount = (progress / 100.0) * totalBudget;
+                                    tvSliderValue.setText(String.format(Locale.getDefault(),
+                                            "%.1f%% of total budget ($%.2f)", (double)progress, newAmount));
+
+                                    // Update the amount field
+                                    etNewAmount.setText(String.format(Locale.getDefault(), "%.2f", newAmount));
+                                }
+                            }
+
+                            @Override
+                            public void onStartTrackingTouch(SeekBar seekBar) {
+                            }
+
+                            @Override
+                            public void onStopTrackingTouch(SeekBar seekBar) {
+                            }
+                        });
+
+                        tvSliderValue.setText(String.format(Locale.getDefault(),
+                                "%.1f%% of total budget ($%.2f)", (double)percentage, amount));
+                    }
+                } catch (NumberFormatException e) {
+                    // Ignore invalid input
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
 
         builder.setPositiveButton("Update", null); // Set button later to prevent auto-dismiss
         builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
@@ -149,8 +263,10 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
             // Validate input
             String amountStr = etNewAmount.getText().toString().trim();
             if (amountStr.isEmpty()) {
-                etNewAmount.setError("Please enter an amount");
-                return;
+                // If empty, use the slider value
+                double amount = (sliderBudgetPercentage.getProgress() / 100.0) * totalBudget;
+                amountStr = String.format(Locale.getDefault(), "%.2f", amount);
+                etNewAmount.setText(amountStr);
             }
 
             try {
@@ -160,9 +276,14 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
                     return;
                 }
 
-                // Check if new amount would exceed total budget
-                if (!expenseDb.validateCategoryBudget(budget.getUserId(), newAmount)) {
-                    Toast.makeText(context, "This amount would exceed your total budget", Toast.LENGTH_SHORT).show();
+                // Make sure this doesn't exceed available budget + current budget allocation
+                double maxAllowable = availableBudget + currentAmount;
+                if (newAmount > maxAllowable) {
+                    etNewAmount.setError("This amount exceeds your available budget");
+                    Toast.makeText(context,
+                            String.format(Locale.getDefault(),
+                                    "Maximum allowable is $%.2f", maxAllowable),
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
 
