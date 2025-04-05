@@ -20,7 +20,7 @@ public class UserDb extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "campus expenses";
     private static final String TABLE_NAME = "user";
-    private static final int DB_VERSION = 1;
+    private static final int DB_VERSION = 2;
     //create col for table
     private static final String ID_COL = "id";
     private static final String USERNAME_COL = "username";

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Adjust Budget Amount"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/tvCurrentBudgetInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Current budget information and spending"
+        android:textStyle="italic"
+        android:layout_marginBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/etNewBudgetAmount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter new budget amount"
+        android:inputType="numberDecimal"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Information about total budget -->
+    <TextView
+        android:id="@+id/tvTotalBudgetInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Your total monthly budget: $1000.00"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/tvAllocatedBudgetInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Already allocated: $800.00"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/tvAvailableBudgetInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Available to allocate: $200.00"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+</LinearLayout>
