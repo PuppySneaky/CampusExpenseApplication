@@ -253,6 +253,11 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
 
             // Check if category budgets need adjustment
             checkCategoryBudgetsAgainstTotal();
+
+            // Refresh all fragments
+            if (getActivity() instanceof MenuActivity) {
+                ((MenuActivity) getActivity()).refreshAllDataFragments();
+            }
         } else {
             Toast.makeText(getContext(), "Failed to set total budget", Toast.LENGTH_SHORT).show();
         }
