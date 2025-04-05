@@ -52,6 +52,7 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
 
+
         // Get user ID from intent
         Intent intent = getIntent();
         if (intent != null && intent.getExtras() != null) {
@@ -59,9 +60,39 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
             Log.d(TAG, "User ID loaded: " + userId);
         }
 
+        // Initialize components
+        mainHandler = new Handler(Looper.getMainLooper());
+        notificationManager = new BudgetNotificationManager(this);
+        requestNotificationPermissionIfNeeded();
+        initializeDatabase();
+
+        // Initialize UI components
+        bottomNavigationView = findViewById(R.id.bottom_navigation);
+        viewPager2 = findViewById(R.id.viewPager);
+        drawerLayout = findViewById(R.id.drawer_layout);
+        toolbar = findViewById(R.id.toolbar);
+
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setDisplayShowTitleEnabled(false);
+
+
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.open_nav, R.string.close_nav);
+        drawerLayout.addDrawerListener(toggle);
+        toggle.syncState();
+
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        navigationView.setNavigationItemSelectedListener(this);
+
+        Menu menu = navigationView.getMenu();
+        MenuItem logout = menu.findItem(R.id.nav_logout);
+        setupViewPager();
+
+
+
 // This makes sure the budget fragment is properly accessed and handles errors gracefully
 
 // Check if we need to navigate to budget tab with specific category
+
         if (getIntent().getBooleanExtra("NAVIGATE_TO_BUDGET", false)) {
             try {
                 // Switch to budget tab (index 2)
@@ -109,6 +140,7 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
             }
         }
 
+
         // Initialize main thread handler
         mainHandler = new Handler(Looper.getMainLooper());
 
@@ -129,17 +161,6 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
 
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
-
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.open_nav, R.string.close_nav);
-        drawerLayout.addDrawerListener(toggle);
-        toggle.syncState();
-
-        NavigationView navigationView = findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(this);
-
-        Menu menu = navigationView.getMenu();
-        MenuItem logout = menu.findItem(R.id.nav_logout);
-        setupViewPager();
 
         // Setup logout button
         logout.setOnMenuItemClickListener(item -> {
@@ -322,4 +343,6 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
         drawerLayout.closeDrawer(GravityCompat.START);
         return true;
     }
+
+
 }
