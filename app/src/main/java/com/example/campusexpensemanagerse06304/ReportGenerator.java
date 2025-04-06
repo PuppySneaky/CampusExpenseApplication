@@ -173,76 +173,293 @@ public class ReportGenerator {
     }
 
     /**
-     * Generate a PDF expense report with better table formatting
-     * Note: This is still a text-based implementation, but with improved visual formatting
+     * Generate a PDF expense report with better table formatting and matching CSV features
+     *
+     * @param userId User ID
+     * @param startDate Start date in format yyyy-MM-dd
+     * @param endDate End date in format yyyy-MM-dd
+     * @return Path to the generated PDF file, or null if generation failed
      */
     public String generatePDFReport(int userId, String startDate, String endDate) {
-        try {
-            Document document = new Document();
-            String fileName = "Expense_Report_" + startDate + "_to_" + endDate + ".pdf";
-            File file = new File(context.getExternalFilesDir(null), fileName);
-            PdfWriter.getInstance(document, new FileOutputStream(file));
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        Date start, end;
 
+        try {
+            start = dateFormat.parse(startDate);
+            end = dateFormat.parse(endDate);
+        } catch (ParseException e) {
+            Log.e(TAG, "Invalid date format", e);
+            return null;
+        }
+
+        // Get all expenses for the user and date range
+        List<Expense> filteredExpenses = getFilteredExpenses(userId, start, end);
+
+        if (filteredExpenses.isEmpty()) {
+            Log.e(TAG, "No expenses found for the selected period");
+            return null;
+        }
+
+        // Get all categories for mapping
+        List<Category> categories = expenseDb.getAllCategories();
+        Map<Integer, String> categoryMap = createCategoryMap(categories);
+
+        // Get budgets for comparison (if applicable)
+        Map<Integer, Double> budgetMap = getBudgetMap(userId);
+
+        // Calculate category totals
+        Map<Integer, Double> categoryTotals = calculateCategoryTotals(filteredExpenses);
+        double grandTotal = 0;
+        for (Double total : categoryTotals.values()) {
+            grandTotal += total;
+        }
+
+        // Calculate monthly totals if spanning multiple months
+        boolean multipleMonths = isReportSpanningMultipleMonths(start, end);
+        Map<String, Double> monthlyTotals = null;
+        if (multipleMonths) {
+            monthlyTotals = calculateMonthlyTotals(filteredExpenses);
+        }
+
+        // Create PDF document
+        Document document = new Document();
+        String fileName = "Expense_Report_" + startDate + "_to_" + endDate + ".pdf";
+        File file = new File(context.getExternalFilesDir(null), fileName);
+
+        try {
+            PdfWriter.getInstance(document, new FileOutputStream(file));
             document.open();
 
-            // Add title
+            // Add document metadata
+            document.addCreationDate();
+            document.addTitle("Campus Expense Manager Report");
+            document.addSubject("Expense Report for period: " + startDate + " to " + endDate);
+
+            // Add title and metadata
             Font titleFont = new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD);
+            Font headingFont = new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD);
+            Font normalFont = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL);
+            Font smallBoldFont = new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD);
+
+            // Report Title
             Paragraph title = new Paragraph("CAMPUS EXPENSE MANAGER REPORT", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
 
-            // Add period and summary info
-            document.add(new Paragraph("Period: " + startDate + " to " + endDate));
-            document.add(new Paragraph(""));
+            // Add metadata
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Generated: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()), normalFont));
+            document.add(new Paragraph("Period: " + startDate + " to " + endDate, normalFont));
+            document.add(new Paragraph(" "));
 
-            // Add actual tables for expense details
-            PdfPTable expenseTable = new PdfPTable(4);
+            // SECTION 1: EXPENSE TRANSACTIONS
+            Paragraph expenseTitle = new Paragraph("EXPENSE TRANSACTIONS", headingFont);
+            document.add(expenseTitle);
+            document.add(new Paragraph(" "));
+
+            // Create transaction table
+            PdfPTable expenseTable = new PdfPTable(5); // 5 columns
             expenseTable.setWidthPercentage(100);
 
-            // Add table headers
-            expenseTable.addCell("Date");
-            expenseTable.addCell("Amount");
-            expenseTable.addCell("Description");
-            expenseTable.addCell("Category");
-
-
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            Date start, end;
-
+            // Try to set column widths for better appearance
             try {
-                start = dateFormat.parse(startDate);
-                end = dateFormat.parse(endDate);
-            } catch (ParseException e) {
-                Log.e(TAG, "Invalid date format", e);
-                return null;
+                expenseTable.setWidths(new float[]{2, 2, 3, 2, 2});
+            } catch (DocumentException e) {
+                Log.e(TAG, "Error setting column widths", e);
             }
-            List<Category> categories = expenseDb.getAllCategories();
 
+            // Add table headers
+            PdfPCell headerCell;
 
-            Map<Integer, String> categoryMap = createCategoryMap(categories);
+            headerCell = new PdfPCell(new Paragraph("Date", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            expenseTable.addCell(headerCell);
 
-            List<Expense> filteredExpenses = getFilteredExpenses(userId, start, end);
+            headerCell = new PdfPCell(new Paragraph("Amount", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            expenseTable.addCell(headerCell);
 
-            // Add expense rows
+            headerCell = new PdfPCell(new Paragraph("Description", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            expenseTable.addCell(headerCell);
+
+            headerCell = new PdfPCell(new Paragraph("Category", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            expenseTable.addCell(headerCell);
+
+            headerCell = new PdfPCell(new Paragraph("Payment Method", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            expenseTable.addCell(headerCell);
+
+            // Add expense data rows
+            PdfPCell cell;
             for (Expense expense : filteredExpenses) {
-                expenseTable.addCell(dateFormat.format(expense.getDate()));
-                expenseTable.addCell(String.format("$%.2f", expense.getAmount()));
-                expenseTable.addCell(expense.getDescription());
-                expenseTable.addCell(categoryMap.getOrDefault(expense.getCategoryId(), "Unknown"));
+                // Date
+                cell = new PdfPCell(new Paragraph(dateFormat.format(expense.getDate()), normalFont));
+                expenseTable.addCell(cell);
+
+                // Amount
+                cell = new PdfPCell(new Paragraph(String.format(Locale.getDefault(), "$%.2f", expense.getAmount()), normalFont));
+                cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                expenseTable.addCell(cell);
+
+                // Description
+                cell = new PdfPCell(new Paragraph(expense.getDescription(), normalFont));
+                expenseTable.addCell(cell);
+
+                // Category
+                cell = new PdfPCell(new Paragraph(categoryMap.getOrDefault(expense.getCategoryId(), "Unknown"), normalFont));
+                expenseTable.addCell(cell);
+
+                // Payment Method
+                cell = new PdfPCell(new Paragraph(expense.getPaymentMethod(), normalFont));
+                expenseTable.addCell(cell);
             }
 
             document.add(expenseTable);
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph(" "));
 
-            // Add more sections (category summary, etc.)
+            // SECTION 2: CATEGORY SUMMARY
+            Paragraph categoryTitle = new Paragraph("CATEGORY SUMMARY", headingFont);
+            document.add(categoryTitle);
+            document.add(new Paragraph(" "));
+
+            // Create category summary table
+            PdfPTable categoryTable = new PdfPTable(5); // 5 columns
+            categoryTable.setWidthPercentage(100);
+
+            // Try to set column widths for better appearance
+            try {
+                categoryTable.setWidths(new float[]{3, 2, 2, 2, 2});
+            } catch (DocumentException e) {
+                Log.e(TAG, "Error setting column widths", e);
+            }
+
+            // Add table headers
+            headerCell = new PdfPCell(new Paragraph("Category", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            categoryTable.addCell(headerCell);
+
+            headerCell = new PdfPCell(new Paragraph("Total Amount", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            categoryTable.addCell(headerCell);
+
+            headerCell = new PdfPCell(new Paragraph("Budget Amount", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            categoryTable.addCell(headerCell);
+
+            headerCell = new PdfPCell(new Paragraph("Remaining Budget", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            categoryTable.addCell(headerCell);
+
+            headerCell = new PdfPCell(new Paragraph("% of Budget Used", smallBoldFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+            categoryTable.addCell(headerCell);
+
+            // Add category data rows
+            for (Map.Entry<Integer, Double> entry : categoryTotals.entrySet()) {
+                int categoryId = entry.getKey();
+                double totalSpent = entry.getValue();
+
+                String categoryName = categoryMap.getOrDefault(categoryId, "Unknown");
+                double budgetAmount = budgetMap.getOrDefault(categoryId, 0.0);
+                double remaining = budgetAmount - totalSpent;
+                double percentUsed = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
+
+                // Category
+                cell = new PdfPCell(new Paragraph(categoryName, normalFont));
+                categoryTable.addCell(cell);
+
+                // Total Amount
+                cell = new PdfPCell(new Paragraph(String.format(Locale.getDefault(), "$%.2f", totalSpent), normalFont));
+                cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                categoryTable.addCell(cell);
+
+                // Budget Amount
+                cell = new PdfPCell(new Paragraph(String.format(Locale.getDefault(), "$%.2f", budgetAmount), normalFont));
+                cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                categoryTable.addCell(cell);
+
+                // Remaining Budget
+                cell = new PdfPCell(new Paragraph(String.format(Locale.getDefault(), "$%.2f", remaining), normalFont));
+                cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                categoryTable.addCell(cell);
+
+                // % of Budget Used
+                cell = new PdfPCell(new Paragraph(String.format(Locale.getDefault(), "%.1f%%", percentUsed), normalFont));
+                cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                categoryTable.addCell(cell);
+            }
+
+            // Add grand total row
+            cell = new PdfPCell(new Paragraph("Total", smallBoldFont));
+            categoryTable.addCell(cell);
+
+            cell = new PdfPCell(new Paragraph(String.format(Locale.getDefault(), "$%.2f", grandTotal), smallBoldFont));
+            cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            categoryTable.addCell(cell);
+
+            // Empty cells for the rest of the row
+            categoryTable.addCell("");
+            categoryTable.addCell("");
+            categoryTable.addCell("");
+
+            document.add(categoryTable);
+
+            // SECTION 3: MONTHLY DISTRIBUTION (if applicable)
+            if (multipleMonths && monthlyTotals != null && !monthlyTotals.isEmpty()) {
+                document.add(new Paragraph(" "));
+                document.add(new Paragraph(" "));
+                Paragraph monthlyTitle = new Paragraph("MONTHLY DISTRIBUTION", headingFont);
+                document.add(monthlyTitle);
+                document.add(new Paragraph(" "));
+
+                // Create monthly distribution table
+                PdfPTable monthlyTable = new PdfPTable(2); // 2 columns
+                monthlyTable.setWidthPercentage(70);
+
+                // Add table headers
+                headerCell = new PdfPCell(new Paragraph("Month", smallBoldFont));
+                headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+                monthlyTable.addCell(headerCell);
+
+                headerCell = new PdfPCell(new Paragraph("Total Amount", smallBoldFont));
+                headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                headerCell.setBackgroundColor(new com.itextpdf.text.BaseColor(220, 220, 220));
+                monthlyTable.addCell(headerCell);
+
+                // Add monthly data rows
+                for (Map.Entry<String, Double> entry : monthlyTotals.entrySet()) {
+                    cell = new PdfPCell(new Paragraph(entry.getKey(), normalFont));
+                    monthlyTable.addCell(cell);
+
+                    cell = new PdfPCell(new Paragraph(String.format(Locale.getDefault(), "$%.2f", entry.getValue()), normalFont));
+                    cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                    monthlyTable.addCell(cell);
+                }
+
+                document.add(monthlyTable);
+            }
 
             document.close();
             return file.getAbsolutePath();
-        } catch (Exception e) {
-            Log.e(TAG, "Error generating PDF", e);
+        } catch (DocumentException | IOException e) {
+            Log.e(TAG, "Error generating PDF report", e);
             return null;
         }
     }
-
     /**
      * Create a centered title with decoration
      */
