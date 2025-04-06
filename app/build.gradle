@@ -38,6 +38,10 @@ dependencies {
     implementation 'androidx.navigation:navigation-fragment:2.7.7'
     implementation 'androidx.navigation:navigation-ui:2.7.7'
 
+
+    implementation 'com.itextpdf:itextpdf:5.5.13.3'
+
+
     // MPAndroidChart for data visualization
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
 

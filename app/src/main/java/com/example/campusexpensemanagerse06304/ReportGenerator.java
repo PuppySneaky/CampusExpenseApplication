@@ -15,6 +15,18 @@ import com.example.campusexpensemanagerse06304.model.Budget;
 import com.example.campusexpensemanagerse06304.model.Category;
 import com.example.campusexpensemanagerse06304.model.Expense;
 
+
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfWriter;
+
+
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
 
 /**
  * Enhanced Utility class to generate expense reports in different formats
@@ -164,138 +177,68 @@ public class ReportGenerator {
      * Note: This is still a text-based implementation, but with improved visual formatting
      */
     public String generatePDFReport(int userId, String startDate, String endDate) {
-        // In a real app, you would use a PDF library like iText or PDFBox
-        // For this example, we'll create a better-formatted text file with .pdf extension
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        Date start, end;
-
         try {
-            start = dateFormat.parse(startDate);
-            end = dateFormat.parse(endDate);
-        } catch (ParseException e) {
-            Log.e(TAG, "Invalid date format", e);
-            return null;
-        }
+            Document document = new Document();
+            String fileName = "Expense_Report_" + startDate + "_to_" + endDate + ".pdf";
+            File file = new File(context.getExternalFilesDir(null), fileName);
+            PdfWriter.getInstance(document, new FileOutputStream(file));
 
-        // *** QUERY 1: Get filtered expenses ***
-        List<Expense> filteredExpenses = getFilteredExpenses(userId, start, end);
+            document.open();
 
-        if (filteredExpenses.isEmpty()) {
-            return null;
-        }
+            // Add title
+            Font titleFont = new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD);
+            Paragraph title = new Paragraph("CAMPUS EXPENSE MANAGER REPORT", titleFont);
+            title.setAlignment(Element.ALIGN_CENTER);
+            document.add(title);
 
-        // *** QUERY 2: Get categories ***
-        List<Category> categories = expenseDb.getAllCategories();
-        Map<Integer, String> categoryMap = createCategoryMap(categories);
+            // Add period and summary info
+            document.add(new Paragraph("Period: " + startDate + " to " + endDate));
+            document.add(new Paragraph(""));
 
-        // *** QUERY 3: Get budgets ***
-        Map<Integer, Double> budgetMap = getBudgetMap(userId);
+            // Add actual tables for expense details
+            PdfPTable expenseTable = new PdfPTable(4);
+            expenseTable.setWidthPercentage(100);
 
-        // Calculate totals and summaries
-        double totalExpenses = calculateTotalExpenses(filteredExpenses);
-        double totalBudget = calculateTotalBudget(budgetMap);
-        Map<Integer, Double> categoryTotals = calculateCategoryTotals(filteredExpenses);
+            // Add table headers
+            expenseTable.addCell("Date");
+            expenseTable.addCell("Amount");
+            expenseTable.addCell("Description");
+            expenseTable.addCell("Category");
 
-        // Get current date and time for header
-        String generatedTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
 
-        // Build report content with better table formatting
-        StringBuilder reportBuilder = new StringBuilder();
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            Date start, end;
 
-        // ====== HEADER SECTION ======
-        reportBuilder.append(createCenteredTitle("CAMPUS EXPENSE MANAGER EXPENSE REPORT", 100));
-        reportBuilder.append("Generated: ").append(generatedTime).append("\n");
-        reportBuilder.append("Period: ").append(startDate).append(" to ").append(endDate).append("\n\n");
-
-        // ====== SUMMARY SECTION ======
-        reportBuilder.append(createBoxedSection("SUMMARY", 100));
-        reportBuilder.append(String.format("Total Expenses: $%.2f | Total Budget: $%.2f | Remaining Budget: $%.2f | Budget Utilization: %.1f%%\n\n",
-                totalExpenses, totalBudget, totalBudget - totalExpenses,
-                (totalBudget > 0 ? (totalExpenses / totalBudget) * 100 : 0)));
-
-        // ====== EXPENSE DETAILS SECTION ======
-        reportBuilder.append(createBoxedSection("EXPENSE DETAILS", 100));
-
-        // Create a table header with fixed width columns
-        reportBuilder.append(String.format("%-12s %-10s %-25s %-25s\n", "Date", "Amount", "Description", "Category"));
-        reportBuilder.append(createRepeatedChar('-', 80)).append('\n');
-
-        // Add expense rows with fixed width columns
-        for (Expense expense : filteredExpenses) {
-            reportBuilder.append(String.format("%-12s $%-9.2f %-25s %-25s\n",
-                    dateFormat.format(expense.getDate()),
-                    expense.getAmount(),
-                    truncateString(expense.getDescription(), 23),
-                    truncateString(categoryMap.getOrDefault(expense.getCategoryId(), "Unknown"), 23)));
-        }
-        reportBuilder.append('\n');
-
-        // ====== CATEGORY SUMMARY SECTION ======
-        reportBuilder.append(createBoxedSection("CATEGORY SUMMARY", 100));
-
-        // Create a table header with fixed width columns
-        reportBuilder.append(String.format("%-20s %-15s %-15s %-15s %-15s\n",
-                "Category", "Spent", "Budget", "Remaining", "% Used"));
-        reportBuilder.append(createRepeatedChar('-', 90)).append('\n');
-
-        // Add category summary rows
-        for (Map.Entry<Integer, Double> entry : categoryTotals.entrySet()) {
-            int categoryId = entry.getKey();
-            double totalSpent = entry.getValue();
-
-            String categoryName = categoryMap.getOrDefault(categoryId, "Unknown");
-            double budgetAmount = budgetMap.getOrDefault(categoryId, 0.0);
-            double remaining = budgetAmount - totalSpent;
-            double percentUsed = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
-
-            reportBuilder.append(String.format("%-20s $%-14.2f $%-14.2f $%-14.2f %-15s\n",
-                    truncateString(categoryName, 18),
-                    totalSpent,
-                    budgetAmount,
-                    remaining,
-                    String.format("%.1f%%", percentUsed)));
-        }
-
-        // Add grand total
-        reportBuilder.append(createRepeatedChar('-', 90)).append('\n');
-        reportBuilder.append(String.format("%-20s $%-14.2f $%-14.2f $%-14.2f\n",
-                "TOTAL",
-                totalExpenses,
-                totalBudget,
-                totalBudget - totalExpenses));
-        reportBuilder.append('\n');
-
-        // ====== MONTHLY DISTRIBUTION (if applicable) ======
-        if (isReportSpanningMultipleMonths(start, end)) {
-            reportBuilder.append(createBoxedSection("MONTHLY DISTRIBUTION", 100));
-
-            // Create a table header
-            reportBuilder.append(String.format("%-20s %-15s\n", "Month", "Amount"));
-            reportBuilder.append(createRepeatedChar('-', 40)).append('\n');
-
-            Map<String, Double> monthlyTotals = calculateMonthlyTotals(filteredExpenses);
-            for (Map.Entry<String, Double> entry : monthlyTotals.entrySet()) {
-                reportBuilder.append(String.format("%-20s $%-14.2f\n",
-                        entry.getKey(),
-                        entry.getValue()));
+            try {
+                start = dateFormat.parse(startDate);
+                end = dateFormat.parse(endDate);
+            } catch (ParseException e) {
+                Log.e(TAG, "Invalid date format", e);
+                return null;
             }
-            reportBuilder.append('\n');
-        }
+            List<Category> categories = expenseDb.getAllCategories();
 
-        // ====== FOOTER ======
-        reportBuilder.append(createRepeatedChar('=', 100)).append('\n');
-        reportBuilder.append("End of Report\n");
 
-        // Write to file
-        String fileName = "Expense_Report_" + startDate + "_to_" + endDate + ".pdf";
-        File file = new File(context.getExternalFilesDir(null), fileName);
+            Map<Integer, String> categoryMap = createCategoryMap(categories);
 
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            fos.write(reportBuilder.toString().getBytes());
+            List<Expense> filteredExpenses = getFilteredExpenses(userId, start, end);
+
+            // Add expense rows
+            for (Expense expense : filteredExpenses) {
+                expenseTable.addCell(dateFormat.format(expense.getDate()));
+                expenseTable.addCell(String.format("$%.2f", expense.getAmount()));
+                expenseTable.addCell(expense.getDescription());
+                expenseTable.addCell(categoryMap.getOrDefault(expense.getCategoryId(), "Unknown"));
+            }
+
+            document.add(expenseTable);
+
+            // Add more sections (category summary, etc.)
+
+            document.close();
             return file.getAbsolutePath();
-        } catch (IOException e) {
-            Log.e(TAG, "Error writing PDF file", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Error generating PDF", e);
             return null;
         }
     }

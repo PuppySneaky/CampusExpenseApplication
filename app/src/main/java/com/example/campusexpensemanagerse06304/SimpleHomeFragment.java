@@ -2,6 +2,7 @@ package com.example.campusexpensemanagerse06304;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -18,6 +19,12 @@ import com.example.campusexpensemanagerse06304.database.ExpenseDb;
 import com.example.campusexpensemanagerse06304.model.Budget;
 import com.example.campusexpensemanagerse06304.model.Category;
 import com.example.campusexpensemanagerse06304.model.Expense;
+import com.github.mikephil.charting.charts.PieChart;
+import com.github.mikephil.charting.data.PieData;
+import com.github.mikephil.charting.data.PieDataSet;
+import com.github.mikephil.charting.data.PieEntry;
+import com.github.mikephil.charting.formatter.PercentFormatter;
+import com.github.mikephil.charting.utils.ColorTemplate;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -26,6 +33,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class SimpleHomeFragment extends Fragment {
     private static final String TAG = "SimpleHomeFragment";
@@ -285,4 +293,7 @@ public class SimpleHomeFragment extends Fragment {
             refreshData();
         }
     }
+
+    // Add more visualizations like pie charts for category distribution
+
 }
