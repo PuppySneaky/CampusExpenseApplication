@@ -46,6 +46,9 @@
             android:exported="false" />
         <activity android:name=".RecurringExpenseActivity"
             android:exported="false" />
+        <activity android:name=".NotificationSettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".MenuActivity" />
         <activity
             android:name=".SignInActivity"
             android:exported="true"

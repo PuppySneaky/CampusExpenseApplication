@@ -254,10 +254,14 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
     /**
      * Check budgets and send notifications if needed
      */
+// Also update the checkBudgetsAndNotify method to return the count:
     private void checkBudgetsAndNotify() {
         if (userId != -1) {
             try {
-                notificationManager.checkBudgetsAndNotify(userId);
+                int notificationsSent = notificationManager.checkBudgetsAndNotify(userId);
+                if (notificationsSent > 0) {
+                    Log.d(TAG, "Sent " + notificationsSent + " budget notifications");
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error checking budgets", e);
             }

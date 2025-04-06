@@ -71,6 +71,19 @@ public class SettingFragment extends Fragment {
             }
         }
 
+        Button btnNotifications = view.findViewById(R.id.btnNotifications);
+
+
+        // Add this implementation for btnNotifications click listener:
+        btnNotifications.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(getActivity(), NotificationSettingsActivity.class);
+                startActivity(intent);
+            }
+        });
+
+
         // Setup Manage Categories button
         btnManageCategories.setOnClickListener(view1 -> {
             Intent intent = new Intent(getActivity(), CategoryManagementActivity.class);
