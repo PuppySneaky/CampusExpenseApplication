@@ -62,6 +62,14 @@ public class SimpleHistoryFragment extends Fragment {
         btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
         recyclerHistory = view.findViewById(R.id.recyclerHistory);
 
+        // Setup Generate Report button with enhanced functionality
+        btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
+        btnGenerateReport.setOnClickListener(v -> showReportOptions());
+
+// Make sure the button is visually prominent
+        btnGenerateReport.setText("GENERATE REPORT");
+        btnGenerateReport.setBackgroundResource(R.drawable.button_report);
+
         // Initialize database helper
         expenseDb = new ExpenseDb(getContext());
 
@@ -109,8 +117,10 @@ public class SimpleHistoryFragment extends Fragment {
         return view;
     }
 
+// Add these methods to SimpleHistoryFragment.java to enhance report generation
+
     /**
-     * Show dialog with report generation options
+     * Show dialog with report generation options and buttons to select format
      */
     private void showReportOptions() {
         if (filteredExpensesList.isEmpty()) {
@@ -118,58 +128,122 @@ public class SimpleHistoryFragment extends Fragment {
             return;
         }
 
-        // Create report options
-        String[] reportOptions = {"CSV Report", "PDF Report", "Cancel"};
-
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle("Generate Report");
-        builder.setItems(reportOptions, (dialog, which) -> {
-            switch (which) {
-                case 0: // CSV Report
-                    generateAndShareReport("csv");
-                    break;
-                case 1: // PDF Report
-                    generateAndShareReport("pdf");
-                    break;
-                case 2: // Cancel
-                    dialog.dismiss();
-                    break;
-            }
+
+        // Use a custom layout for the dialog
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_report_options, null);
+        builder.setView(dialogView);
+
+        // Find buttons in the custom layout
+        Button btnCsvReport = dialogView.findViewById(R.id.btnCsvReport);
+        Button btnPdfReport = dialogView.findViewById(R.id.btnPdfReport);
+        Button btnCancel = dialogView.findViewById(R.id.btnCancelReport);
+
+        // Create dialog
+        final AlertDialog dialog = builder.create();
+
+        // Set button click listeners
+        btnCsvReport.setOnClickListener(v -> {
+            generateAndShareReport("csv");
+            dialog.dismiss();
         });
-        builder.show();
+
+        btnPdfReport.setOnClickListener(v -> {
+            generateAndShareReport("pdf");
+            dialog.dismiss();
+        });
+
+        btnCancel.setOnClickListener(v -> {
+            dialog.dismiss();
+        });
+
+        dialog.show();
     }
 
     /**
-     * Generate and share the report
+     * Generate and share the report with progress indication
      * @param format Report format (csv or pdf)
      */
     private void generateAndShareReport(String format) {
+        if (userId == -1) {
+            Toast.makeText(getContext(), "User not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String startDateStr = tvStartDate.getText().toString();
         String endDateStr = tvEndDate.getText().toString();
 
-        ReportGenerator reportGenerator = new ReportGenerator(getContext());
-        String filePath;
+        // Show progress dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Generating Report");
+        builder.setMessage("Please wait while your report is being generated...");
+        builder.setCancelable(false);
 
-        if ("csv".equals(format)) {
-            filePath = reportGenerator.generateCSVReport(userId, startDateStr, endDateStr);
-        } else {
-            filePath = reportGenerator.generatePDFReport(userId, startDateStr, endDateStr);
-        }
+        final AlertDialog progressDialog = builder.create();
+        progressDialog.show();
 
-        if (filePath != null) {
-            // Show success message
-            Toast.makeText(getContext(),
-                    "Report generated successfully",
-                    Toast.LENGTH_SHORT).show();
+        // Use a background thread for report generation
+        new Thread(() -> {
+            ReportGenerator reportGenerator = new ReportGenerator(getContext());
+            String filePath;
 
-            // Share the report
-            reportGenerator.shareReport(filePath);
-        } else {
-            Toast.makeText(getContext(),
-                    "Failed to generate report. Please try again.",
-                    Toast.LENGTH_SHORT).show();
-        }
+            if ("csv".equals(format)) {
+                filePath = reportGenerator.generateCSVReport(userId, startDateStr, endDateStr);
+            } else {
+                filePath = reportGenerator.generatePDFReport(userId, startDateStr, endDateStr);
+            }
+
+            // Update UI on main thread
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    progressDialog.dismiss();
+
+                    if (filePath != null) {
+                        // Show success message with file details
+                        AlertDialog.Builder resultBuilder = new AlertDialog.Builder(getContext());
+                        resultBuilder.setTitle("Report Generated Successfully");
+
+                        String fileType = format.toUpperCase();
+                        String message = "Your " + fileType + " report has been created with the following details:\n\n" +
+                                "• Date Range: " + startDateStr + " to " + endDateStr + "\n" +
+                                "• Total Transactions: " + filteredExpensesList.size() + "\n" +
+                                "• Categories Included: " + getCategoryCount() + "\n\n" +
+                                "Would you like to share this report now?";
+
+                        resultBuilder.setMessage(message);
+                        resultBuilder.setPositiveButton("Share", (dialog, which) -> {
+                            reportGenerator.shareReport(filePath);
+                        });
+                        resultBuilder.setNegativeButton("Done", (dialog, which) -> dialog.dismiss());
+                        resultBuilder.show();
+                    } else {
+                        Toast.makeText(getContext(),
+                                "Failed to generate report. Please try again.",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
     }
+
+    /**
+     * Count the number of unique categories in the filtered expenses
+     */
+    private int getCategoryCount() {
+        if (filteredExpensesList.isEmpty()) return 0;
+
+        // Use a Set to count unique category IDs
+        java.util.Set<Integer> uniqueCategories = new java.util.HashSet<>();
+        for (Expense expense : filteredExpensesList) {
+            uniqueCategories.add(expense.getCategoryId());
+        }
+
+        return uniqueCategories.size();
+    }
+
+// Replace the existing showReportOptions() and generateAndShareReport() methods
+// with these enhanced versions in your SimpleHistoryFragment class.
 
     private void loadCategories() {
         categoryList = expenseDb.getAllCategories();
