@@ -617,6 +617,11 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
                 expenseList.clear();
                 expenseList.addAll(expenses);
                 expenseAdapter.notifyDataSetChanged();
+
+                // Add this line if there are expenses in the list
+                if (!expenseList.isEmpty()) {
+                    recyclerExpenses.smoothScrollToPosition(expenseList.size() - 1);
+                }
             }
         }
     }
@@ -689,6 +694,8 @@ public class SimpleExpensesFragment extends Fragment implements RefreshableFragm
             Toast.makeText(getContext(), "Failed to add expense", Toast.LENGTH_SHORT).show();
         }
     }
+
+
 
 
 
