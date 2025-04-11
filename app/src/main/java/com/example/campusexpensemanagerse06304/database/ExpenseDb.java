@@ -716,14 +716,39 @@ public class ExpenseDb extends SQLiteOpenHelper {
         return rowsAffected;
     }
 
-    public int deleteExpense(int id) {
+    /**
+     * Delete an expense
+     * @param expenseId The ID of the expense to delete
+     * @return The number of rows affected
+     */
+// In ExpenseDb.java
+    public int deleteExpense(int expenseId) {
         SQLiteDatabase db = this.getWritableDatabase();
-        String whereClause = EXP_ID_COL + " = ?";
-        String[] whereArgs = {String.valueOf(id)};
+        int result = 0;
 
-        int rowsAffected = db.delete(TABLE_EXPENSE, whereClause, whereArgs);
-        db.close();
-        return rowsAffected;
+        try {
+            String whereClause = EXP_ID_COL + " = ?";
+            String[] whereArgs = {String.valueOf(expenseId)};
+
+            // Log before deletion to debug
+            Cursor cursor = db.query(TABLE_EXPENSE, new String[]{EXP_CAT_ID_COL},
+                    whereClause, whereArgs, null, null, null);
+            if (cursor.moveToFirst()) {
+                @SuppressLint("Range") int categoryId = cursor.getInt(cursor.getColumnIndex(EXP_CAT_ID_COL));
+                Log.d(TAG, "Deleting expense " + expenseId + " with category " + categoryId);
+            }
+            cursor.close();
+
+            // Perform the deletion
+            result = db.delete(TABLE_EXPENSE, whereClause, whereArgs);
+            Log.d(TAG, "Expense deletion result: " + result + " rows affected");
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting expense: " + e.getMessage(), e);
+        } finally {
+            db.close();
+        }
+
+        return result;
     }
 
     public int updateBudget(int id, int categoryId, double amount, String period,
@@ -748,14 +773,59 @@ public class ExpenseDb extends SQLiteOpenHelper {
         return rowsAffected;
     }
 
-    public int deleteBudget(int id) {
-        SQLiteDatabase db = this.getWritableDatabase();
-        String whereClause = BUD_ID_COL + " = ?";
-        String[] whereArgs = {String.valueOf(id)};
+    /**
+     * Delete a budget for a specific category
+     * @param budgetId The ID of the budget to delete
+     * @return true if deletion was successful, false otherwise
+     */
+    @SuppressLint("Range")
+    public boolean deleteBudget(int budgetId) {
+        // First get the category ID associated with this budget
+        int categoryId = -1;
+        SQLiteDatabase readDb = this.getReadableDatabase();
 
-        int rowsAffected = db.delete(TABLE_BUDGET, whereClause, whereArgs);
-        db.close();
-        return rowsAffected;
+        try {
+            String query = "SELECT " + BUD_CAT_ID_COL + " FROM " + TABLE_BUDGET +
+                    " WHERE " + BUD_ID_COL + " = ?";
+
+            Cursor cursor = readDb.rawQuery(query, new String[]{String.valueOf(budgetId)});
+
+            if (cursor.moveToFirst()) {
+                categoryId = cursor.getInt(cursor.getColumnIndex(BUD_CAT_ID_COL));
+            }
+            cursor.close();
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting category ID for budget: " + e.getMessage());
+        } finally {
+            readDb.close();
+        }
+
+        // If we couldn't find the category ID, return false
+        if (categoryId == -1) {
+            return false;
+        }
+
+        // Now check if there are any expenses using this category
+        if (categoryHasExpenses(categoryId)) {
+            // Category has expenses, cannot delete budget
+            return false;
+        }
+
+        // If we get here, it's safe to delete the budget
+        SQLiteDatabase writeDb = this.getWritableDatabase();
+        int rowsAffected = 0;
+
+        try {
+            String whereClause = BUD_ID_COL + " = ?";
+            String[] whereArgs = {String.valueOf(budgetId)};
+            rowsAffected = writeDb.delete(TABLE_BUDGET, whereClause, whereArgs);
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting budget: " + e.getMessage());
+        } finally {
+            writeDb.close();
+        }
+
+        return rowsAffected > 0;
     }
 
     public boolean deleteRecurringExpense(int id) {
@@ -1121,5 +1191,63 @@ public class ExpenseDb extends SQLiteOpenHelper {
         } finally {
             db.close();
         }
+    }
+
+    /**
+     * Check if a category has any associated expenses
+     * @param categoryId The category ID to check
+     * @return true if there are expenses using this category, false otherwise
+     */
+    /**
+     * Check if a category has any associated expenses
+     * @param categoryId The category ID to check
+     * @return true if there are expenses using this category, false otherwise
+     */
+    public boolean categoryHasExpenses(int categoryId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        boolean hasExpenses = false;
+        int expenseCount = 0;
+        int recurringCount = 0;
+
+        try {
+            // Check regular expenses
+            String expenseQuery = "SELECT COUNT(*) FROM " + TABLE_EXPENSE +
+                    " WHERE " + EXP_CAT_ID_COL + " = ?";
+
+            Cursor expenseCursor = db.rawQuery(expenseQuery,
+                    new String[]{String.valueOf(categoryId)});
+
+            if (expenseCursor.moveToFirst()) {
+                expenseCount = expenseCursor.getInt(0);
+                if (expenseCount > 0) {
+                    hasExpenses = true;
+                }
+            }
+            expenseCursor.close();
+
+            // Check recurring expenses
+            String recurringQuery = "SELECT COUNT(*) FROM " + TABLE_RECURRING +
+                    " WHERE " + REC_CAT_ID_COL + " = ?";
+
+            Cursor recurringCursor = db.rawQuery(recurringQuery,
+                    new String[]{String.valueOf(categoryId)});
+
+            if (recurringCursor.moveToFirst()) {
+                recurringCount = recurringCursor.getInt(0);
+                if (recurringCount > 0) {
+                    hasExpenses = true;
+                }
+            }
+            recurringCursor.close();
+
+            Log.d(TAG, "Category " + categoryId + " has " + expenseCount +
+                    " regular expenses and " + recurringCount + " recurring expenses.");
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking if category has expenses: " + e.getMessage(), e);
+        } finally {
+            db.close();
+        }
+
+        return hasExpenses;
     }
 }

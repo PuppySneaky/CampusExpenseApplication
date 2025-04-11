@@ -19,6 +19,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.campusexpensemanagerse06304.MenuActivity;
 import com.example.campusexpensemanagerse06304.R;
 import com.example.campusexpensemanagerse06304.database.ExpenseDb;
 import com.example.campusexpensemanagerse06304.model.Budget;
@@ -376,29 +377,68 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
     }
 
     private void deleteBudget(Budget budget, int position) {
-        try {
-            // Delete from database
-            int result = expenseDb.deleteBudget(budget.getId());
+        int categoryId = budget.getCategoryId();
 
-            if (result > 0) {
-                // Remove from local list
-                budgetList.remove(position);
-                notifyItemRemoved(position);
-                notifyItemRangeChanged(position, budgetList.size());
+        // Log for debugging
+        Log.d(TAG, "Attempting to delete budget for category ID: " + categoryId);
 
-                // Notify listeners
-                if (listener != null) {
-                    listener.onBudgetAdjusted();
-                }
+        // Check if any expenses use this budget's category
+        boolean hasExpenses = expenseDb.categoryHasExpenses(categoryId);
+        Log.d(TAG, "Category has expenses: " + hasExpenses);
 
-                Toast.makeText(context, "Budget deleted successfully", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(context, "Failed to delete budget", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error deleting budget", e);
-            Toast.makeText(context, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        if (hasExpenses) {
+            // Show error message
+            new AlertDialog.Builder(context)
+                    .setTitle("Cannot Delete Budget")
+                    .setMessage("This budget cannot be deleted because there are expenses using its category. Please delete those expenses first or reassign them to another category.")
+                    .setPositiveButton("OK", null)
+                    .show();
+        } else {
+            // Proceed with deletion confirmation
+            new AlertDialog.Builder(context)
+                    .setTitle("Delete Budget")
+                    .setMessage("Are you sure you want to delete this budget for " + budget.getCategoryName() + "?")
+                    .setPositiveButton("Delete", (dialog, which) -> {
+                        try {
+                            // Double-check again right before deleting
+                            if (expenseDb.categoryHasExpenses(categoryId)) {
+                                Toast.makeText(context, "Cannot delete: category has expenses", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+
+                            // Delete the budget
+                            boolean result = expenseDb.deleteBudget(budget.getId());
+
+// In SimpleBudgetAdapter.java, after successful deletion
+                            if (result) {
+                                // Remove from local list
+                                budgetList.remove(position);
+                                notifyItemRemoved(position);
+                                notifyItemRangeChanged(position, budgetList.size());
+
+                                // Force refresh the expense data in case something wasn't properly updated
+                                if (context instanceof MenuActivity) {
+                                    ((MenuActivity) context).refreshAllDataFragments();
+                                }
+
+                                // Notify listeners
+                                if (listener != null) {
+                                    listener.onBudgetAdjusted();
+                                }
+
+                                Toast.makeText(context, "Budget deleted successfully", Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(context, "Failed to delete budget", Toast.LENGTH_SHORT).show();
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error deleting budget", e);
+                            Toast.makeText(context, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
         }
+
     }
 
     @Override
@@ -454,6 +494,8 @@ public class SimpleBudgetAdapter extends RecyclerView.Adapter<SimpleBudgetAdapte
 
         return availableBudget;
     }
+
+
 
 
 }
