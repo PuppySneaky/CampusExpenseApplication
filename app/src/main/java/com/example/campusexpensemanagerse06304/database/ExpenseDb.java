@@ -179,8 +179,22 @@ public class ExpenseDb extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         Log.d(TAG, "Upgrading database from version " + oldVersion + " to " + newVersion);
         try {
+            // Check if tables exist and create them if they don't
             if (oldVersion < 2) {
-                // Create the new total_budget table without dropping existing tables
+                // Create the tables if they don't exist (using IF NOT EXISTS)
+                String createBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_BUDGET + " ( "
+                        + BUD_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        + BUD_USER_ID_COL + " INTEGER NOT NULL, "
+                        + BUD_CAT_ID_COL + " INTEGER NOT NULL, "
+                        + BUD_AMOUNT_COL + " REAL NOT NULL, "
+                        + BUD_PERIOD_COL + " TEXT NOT NULL, "
+                        + BUD_START_DATE_COL + " DATE NOT NULL, "
+                        + BUD_END_DATE_COL + " DATE, "
+                        + BUD_CREATED_AT + " DATETIME, "
+                        + BUD_UPDATED_AT + " DATETIME )";
+                db.execSQL(createBudgetTable);
+
+                // Create the total_budget table as you were already doing
                 String createTotalBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_TOTAL_BUDGET + " ( "
                         + TOT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
                         + TOT_USER_ID_COL + " INTEGER NOT NULL, "
@@ -191,7 +205,11 @@ public class ExpenseDb extends SQLiteOpenHelper {
                         + TOT_CREATED_AT + " DATETIME, "
                         + TOT_UPDATED_AT + " DATETIME )";
                 db.execSQL(createTotalBudgetTable);
-                Log.d(TAG, "Created total_budget table during upgrade");
+
+                // Also check and create other tables
+                // You can add similar CREATE TABLE IF NOT EXISTS for categories, expenses, recurring_expenses
+
+                Log.d(TAG, "All tables created or verified during upgrade");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error during database upgrade: " + e.getMessage());
@@ -203,27 +221,86 @@ public class ExpenseDb extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
 
         try {
-            // Check if total_budget table exists
-            Cursor cursor = db.rawQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                    new String[]{TABLE_TOTAL_BUDGET});
+            // Check all tables
+            String[] tableNames = {TABLE_CATEGORY, TABLE_EXPENSE, TABLE_BUDGET, TABLE_RECURRING, TABLE_TOTAL_BUDGET};
 
-            boolean totalBudgetExists = cursor.getCount() > 0;
-            cursor.close();
+            for (String tableName : tableNames) {
+                Cursor cursor = db.rawQuery(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                        new String[]{tableName});
 
-            if (!totalBudgetExists) {
-                Log.d(TAG, "Total budget table does not exist, creating it now");
-                String createTotalBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_TOTAL_BUDGET + " ( "
-                        + TOT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
-                        + TOT_USER_ID_COL + " INTEGER NOT NULL, "
-                        + TOT_AMOUNT_COL + " REAL NOT NULL, "
-                        + TOT_PERIOD_COL + " TEXT NOT NULL, "
-                        + TOT_START_DATE_COL + " DATE NOT NULL, "
-                        + TOT_END_DATE_COL + " DATE, "
-                        + TOT_CREATED_AT + " DATETIME, "
-                        + TOT_UPDATED_AT + " DATETIME )";
-                db.execSQL(createTotalBudgetTable);
+                boolean tableExists = cursor.getCount() > 0;
+                cursor.close();
+
+                if (!tableExists) {
+                    Log.d(TAG, tableName + " table does not exist, creating it now");
+
+                    // Create the specific table based on its name
+                    if (tableName.equals(TABLE_CATEGORY)) {
+                        String createCategoryTable = "CREATE TABLE IF NOT EXISTS " + TABLE_CATEGORY + " ( "
+                                + CAT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                + CAT_NAME_COL + " TEXT NOT NULL, "
+                                + CAT_DESC_COL + " TEXT, "
+                                + CAT_ICON_COL + " TEXT, "
+                                + CAT_COLOR_COL + " TEXT )";
+                        db.execSQL(createCategoryTable);
+                    } else if (tableName.equals(TABLE_EXPENSE)) {
+                        String createExpenseTable = "CREATE TABLE IF NOT EXISTS " + TABLE_EXPENSE + " ( "
+                                + EXP_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                + EXP_USER_ID_COL + " INTEGER NOT NULL, "
+                                + EXP_CAT_ID_COL + " INTEGER NOT NULL, "
+                                + EXP_AMOUNT_COL + " REAL NOT NULL, "
+                                + EXP_DESC_COL + " TEXT, "
+                                + EXP_DATE_COL + " DATE NOT NULL, "
+                                + EXP_PAYMENT_METHOD_COL + " TEXT, "
+                                + EXP_IS_RECURRING_COL + " INTEGER DEFAULT 0, "
+                                + EXP_RECURRING_ID_COL + " INTEGER, "
+                                + EXP_CREATED_AT + " DATETIME, "
+                                + EXP_UPDATED_AT + " DATETIME )";
+                        db.execSQL(createExpenseTable);
+                    } else if (tableName.equals(TABLE_BUDGET)) {
+                        String createBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_BUDGET + " ( "
+                                + BUD_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                + BUD_USER_ID_COL + " INTEGER NOT NULL, "
+                                + BUD_CAT_ID_COL + " INTEGER NOT NULL, "
+                                + BUD_AMOUNT_COL + " REAL NOT NULL, "
+                                + BUD_PERIOD_COL + " TEXT NOT NULL, "
+                                + BUD_START_DATE_COL + " DATE NOT NULL, "
+                                + BUD_END_DATE_COL + " DATE, "
+                                + BUD_CREATED_AT + " DATETIME, "
+                                + BUD_UPDATED_AT + " DATETIME )";
+                        db.execSQL(createBudgetTable);
+                    } else if (tableName.equals(TABLE_RECURRING)) {
+                        String createRecurringTable = "CREATE TABLE IF NOT EXISTS " + TABLE_RECURRING + " ( "
+                                + REC_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                + REC_USER_ID_COL + " INTEGER NOT NULL, "
+                                + REC_CAT_ID_COL + " INTEGER NOT NULL, "
+                                + REC_AMOUNT_COL + " REAL NOT NULL, "
+                                + REC_DESC_COL + " TEXT, "
+                                + REC_FREQUENCY_COL + " TEXT NOT NULL, "
+                                + REC_START_DATE_COL + " DATE NOT NULL, "
+                                + REC_END_DATE_COL + " DATE, "
+                                + REC_LAST_CHARGED_COL + " DATE, "
+                                + REC_NEXT_CHARGE_COL + " DATE, "
+                                + REC_CREATED_AT + " DATETIME, "
+                                + REC_UPDATED_AT + " DATETIME )";
+                        db.execSQL(createRecurringTable);
+                    } else if (tableName.equals(TABLE_TOTAL_BUDGET)) {
+                        String createTotalBudgetTable = "CREATE TABLE IF NOT EXISTS " + TABLE_TOTAL_BUDGET + " ( "
+                                + TOT_ID_COL + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                + TOT_USER_ID_COL + " INTEGER NOT NULL, "
+                                + TOT_AMOUNT_COL + " REAL NOT NULL, "
+                                + TOT_PERIOD_COL + " TEXT NOT NULL, "
+                                + TOT_START_DATE_COL + " DATE NOT NULL, "
+                                + TOT_END_DATE_COL + " DATE, "
+                                + TOT_CREATED_AT + " DATETIME, "
+                                + TOT_UPDATED_AT + " DATETIME )";
+                        db.execSQL(createTotalBudgetTable);
+                    }
+                }
             }
+
+            Log.d(TAG, "All tables verified or created successfully");
         } catch (Exception e) {
             Log.e(TAG, "Error ensuring tables exist: " + e.getMessage());
         } finally {

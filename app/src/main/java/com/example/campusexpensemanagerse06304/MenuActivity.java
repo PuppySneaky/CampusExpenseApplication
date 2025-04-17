@@ -52,6 +52,8 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
 
+        ExpenseDb db = new ExpenseDb(this);
+        db.ensureTablesExist();
 
         // Get user ID from intent
         Intent intent = getIntent();

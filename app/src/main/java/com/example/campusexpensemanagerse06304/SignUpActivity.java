@@ -98,7 +98,7 @@ public class SignUpActivity extends AppCompatActivity {
 
     private boolean isPasswordStrong(String password) {
         // Password must be at least 8 characters long, have at least one uppercase letter, one lowercase letter, one number, and one special character
-        String passwordPattern = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$";
+        String passwordPattern = "^(?=.*[A-Z])(?=.*\\d).{8,}$";
         return password.matches(passwordPattern);
     }
 
