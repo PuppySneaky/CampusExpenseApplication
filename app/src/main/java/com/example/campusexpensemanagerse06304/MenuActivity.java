@@ -41,6 +41,7 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
     ViewPager2 viewPager2;
     DrawerLayout drawerLayout;
     Toolbar toolbar;
+    NavigationView navigationView;
     private ViewPagerAdapter viewPagerAdapter;
     private int userId = -1;
     private Handler mainHandler;
@@ -82,11 +83,12 @@ public class MenuActivity extends AppCompatActivity implements NavigationView.On
         drawerLayout.addDrawerListener(toggle);
         toggle.syncState();
 
-        NavigationView navigationView = findViewById(R.id.nav_view);
+        navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
         Menu menu = navigationView.getMenu();
         MenuItem logout = menu.findItem(R.id.nav_logout);
+
         setupViewPager();
 
 

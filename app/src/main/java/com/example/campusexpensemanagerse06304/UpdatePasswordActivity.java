@@ -45,11 +45,25 @@ public class UpdatePasswordActivity extends AppCompatActivity {
                     edtNewPw.setError("New Password can not empty");
                     return;
                 }
+                
                 String confirmNewPw = edtConfirmPw.getText().toString().trim();
                 if (! confirmNewPw.equals(newPw)) {
                     edtConfirmPw.setError("Confirm New Password not equal New Password");
                     return;
                 }
+
+                // Check if password is strong
+                if (!isPasswordStrong(newPw)) {
+                    edtNewPw.setError("Password is too weak. Must contain at least 8 characters, a number, an uppercase letter, and a special character.");
+                    return;
+                }
+
+                String currentPassword = userDb.getCurrentPassword(account, email);
+                if (newPw.equals(currentPassword)) {
+                    edtNewPw.setError("New password cannot be the same as the old password");
+                    return;
+                }
+
                 int update = userDb.changePassword(newPw, account, email);
                 if (update == -1) {
                     Toast.makeText(UpdatePasswordActivity.this, "Update Failed", Toast.LENGTH_SHORT).show();
@@ -63,5 +77,11 @@ public class UpdatePasswordActivity extends AppCompatActivity {
             }
 
         });
+    }
+
+    private boolean isPasswordStrong(String password) {
+        // Password must be at least 8 characters long, have at least one uppercase letter, one lowercase letter, one number, and one special character
+        String passwordPattern = "^(?=.*[A-Z])(?=.*\\d).{8,}$";
+        return password.matches(passwordPattern);
     }
 }

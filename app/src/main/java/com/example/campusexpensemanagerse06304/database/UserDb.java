@@ -137,6 +137,28 @@ public class UserDb extends SQLiteOpenHelper {
         }
         return check;
     }
+
+    // Inside UserDb class
+    @SuppressLint("Range")
+    public String getCurrentPassword(String username, String email) {
+        String currentPassword = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            String[] cols = {PASSWORD_COL};
+            String condition = USERNAME_COL + " =? AND " + EMAIL_COL + " =? ";
+            String[] params = {username, email};
+            Cursor cursor = db.query(TABLE_NAME, cols, condition, params, null, null, null);
+            if (cursor.getCount() > 0) {
+                cursor.moveToFirst();
+                currentPassword = cursor.getString(cursor.getColumnIndex(PASSWORD_COL));
+            }
+            cursor.close();
+            db.close();
+        } catch (RuntimeException e) {
+            throw new RuntimeException(e);
+        }
+        return currentPassword;
+    }
 }
 
 
