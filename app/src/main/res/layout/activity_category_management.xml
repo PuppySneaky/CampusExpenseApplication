@@ -9,7 +9,7 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="?attr/colorPrimary"
+        android:background="#A6E4E9"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp">
@@ -39,7 +39,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginTop="56dp"
-        android:padding="16dp"/>
+        android:padding="16dp"
+        android:background="@drawable/gradient_sky_reverse"/>
 
     <!-- FAB -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton

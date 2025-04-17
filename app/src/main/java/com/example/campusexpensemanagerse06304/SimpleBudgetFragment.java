@@ -160,7 +160,7 @@ public class SimpleBudgetFragment extends Fragment implements RefreshableFragmen
             // Show a toast to explain
             Toast.makeText(getContext(),
                     "All categories already have budgets. You can adjust or delete existing budgets.",
-                    Toast.LENGTH_LONG).show();
+                    Toast.LENGTH_LONG);
         } else {
             // Enable the allocation section if it was disabled
             spinnerBudgetCategory.setEnabled(true);

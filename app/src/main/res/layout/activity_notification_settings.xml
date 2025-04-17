@@ -3,19 +3,18 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:orientation="vertical">
 
     <!-- Toolbar -->
     <LinearLayout
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="?attr/colorPrimary"
+        android:background="#A6E4E9"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp"
-        android:layout_marginBottom="16dp">
+        >
 
         <Button
             android:id="@+id/btnBack"
@@ -39,12 +38,16 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:background="@drawable/gradient_sky_reverse">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            >
 
             <!-- Enable/Disable Notifications Card -->
             <androidx.cardview.widget.CardView
@@ -299,13 +302,19 @@
     </ScrollView>
 
     <!-- Save Button -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:background="@drawable/gradient_sky"
+        >
     <Button
         android:id="@+id/btnSaveNotificationSettings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="SAVE SETTINGS"
-        android:layout_marginTop="16dp"
         android:textSize="16sp"
-        android:padding="12dp"
-        android:textColor="#FFFFFF"/>
+        android:textColor="@color/white"
+        android:background="@color/black"/>
+</LinearLayout>
 </LinearLayout>

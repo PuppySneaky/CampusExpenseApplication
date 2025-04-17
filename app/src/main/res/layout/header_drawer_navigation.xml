@@ -1,24 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="170dp"
-    android:padding="16dp"
-    android:gravity="center_vertical"
+    android:padding="15dp"
     android:background="@drawable/header">
 
     <ImageView
-        android:id="@+id/profile_icon"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:src="@drawable/kuro"
-        android:contentDescription="Profile" />
-
-    <LinearLayout
-        android:orientation="vertical"
-        android:layout_marginStart="12dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content">
-
-    </LinearLayout>
+        android:layout_width="150dp"
+        android:layout_height="120dp"
+        android:layout_gravity="center_horizontal"
+        android:contentDescription="Logo"
+        android:src="@drawable/kuro2" />
 </LinearLayout>

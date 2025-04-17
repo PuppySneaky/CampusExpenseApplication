@@ -44,7 +44,8 @@
             app:itemIconTint="@color/white"
             android:elevation="8dp"
             android:paddingTop="3dp"
-            android:paddingBottom="3dp" />
+            android:paddingBottom="3dp"
+            />
 
     </RelativeLayout>
 
